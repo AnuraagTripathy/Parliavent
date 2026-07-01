@@ -135,3 +135,20 @@ Output:
 }
 
 For now, use mockJudge.ts.
+
+## Current transition
+
+The app has completed the static prototype, interactions, and published view.
+
+Next architectural step:
+Move judge analysis behind /api/judge.
+
+Do not jump directly from local mock data to full AI + web search.
+
+Correct order:
+1. Local mock data
+2. Mock API route
+3. Debounced frontend calls
+4. Real structured LLM judge
+5. Evidence search
+6. Persistence/database
