@@ -6,9 +6,21 @@ import { FindingCard } from "./FindingCard";
 
 interface FindingsPanelProps {
   findings: Finding[];
+  onUseSuggestion: (findingId: string) => void;
+  onKeepAsIs: (findingId: string) => void;
+  onAttachSource: (findingId: string, sourceId: string) => void;
+  onMarkAsOpinion: (findingId: string) => void;
+  onDispute: (findingId: string, reason: string) => void;
 }
 
-export function FindingsPanel({ findings }: FindingsPanelProps) {
+export function FindingsPanel({
+  findings,
+  onUseSuggestion,
+  onKeepAsIs,
+  onAttachSource,
+  onMarkAsOpinion,
+  onDispute,
+}: FindingsPanelProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -33,7 +45,14 @@ export function FindingsPanel({ findings }: FindingsPanelProps) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: index * 0.06, ease: "easeOut" }}
           >
-            <FindingCard finding={finding} />
+            <FindingCard
+              finding={finding}
+              onUseSuggestion={onUseSuggestion}
+              onKeepAsIs={onKeepAsIs}
+              onAttachSource={onAttachSource}
+              onMarkAsOpinion={onMarkAsOpinion}
+              onDispute={onDispute}
+            />
           </motion.div>
         ))}
       </div>

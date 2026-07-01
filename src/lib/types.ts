@@ -12,6 +12,10 @@ export type CurrentView = "composer" | "review" | "published";
 
 export type CheckingState = "idle" | "checking" | "complete";
 
+export type PostKind = "starter" | "response";
+
+export type FeedSort = "hot" | "new" | "top";
+
 export interface Source {
   id: string;
   title: string;
@@ -58,6 +62,37 @@ export interface PublishedArgument {
   citations: Citation[];
   contestedFallacies?: string[];
   caveats?: string[];
+  kind?: PostKind;
+  issueId?: string;
+  parentId?: string;
+  deskBangs?: number;
+  userBanged?: boolean;
 }
 
-export type AppScreen = "feed" | "argument" | "composer";
+export interface Issue {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  starterCount: number;
+  responseCount: number;
+  deskBangs: number;
+  lastActive: string;
+  isHot?: boolean;
+}
+
+export interface ComposerContext {
+  mode: PostKind;
+  issueId: string;
+  issueTitle: string;
+  parentId?: string;
+  parentAuthor?: string;
+  parentPreview?: string;
+}
+
+export type AppScreen =
+  | "feed"
+  | "issue"
+  | "post"
+  | "composer"
+  | "argument";

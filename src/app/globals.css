@@ -1,11 +1,12 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f7f7f5;
-  --foreground: #1a1a18;
-  --muted: #9a9a96;
-  --border: #e8e8e4;
-  --surface: #fafaf8;
+  --background: #09090b;
+  --foreground: #fafafa;
+  --muted: #71717a;
+  --border: #27272a;
+  --surface: #18181b;
+  --accent: #2dd4bf;
 }
 
 @theme inline {
@@ -26,5 +27,9 @@ mark {
 }
 
 textarea::placeholder {
-  color: #c0c0bc;
+  color: #52525b;
+}
+
+::selection {
+  background: rgba(45, 212, 191, 0.25);
 }

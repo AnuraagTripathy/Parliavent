@@ -6,6 +6,9 @@ export const MOTION =
 export const SEED_ARGUMENT =
   "Cities need to ban cars downtown. Every time I go there's traffic, honking, and someone almost gets hit. If we don't ban cars now, downtowns will become unlivable death zones. Europe does it and their cities are way nicer.";
 
+export const SEED_RESPONSE =
+  "Partial bans sound reasonable, but American downtowns were built around the car. Congestion pricing keeps access for deliveries and emergency vehicles while still cutting traffic — a full ban removes that flexibility.";
+
 export const MOCK_FINDINGS: Finding[] = [
   {
     id: "finding-clarity-1",

@@ -1,103 +1,173 @@
-import { ArrowRight, FileText } from "lucide-react";
-import { MOTION } from "@/lib/mockJudge";
-import { MOCK_PUBLISHED_ARGUMENTS } from "@/lib/mockPublishedArguments";
-import type { PublishedArgument } from "@/lib/types";
+"use client";
+
+import { Flame, MessageSquare, Plus } from "lucide-react";
+import {
+  formatDeskBangs,
+  getHotIssues,
+  MOCK_ISSUES,
+} from "@/lib/mockFeed";
+import type { Issue } from "@/lib/types";
 
 interface DebateFeedProps {
-  onOpenArgument: (id: string) => void;
-  onWrite: () => void;
+  onOpenIssue: (issueId: string) => void;
+  onNewStarter: (issueId: string) => void;
 }
 
-function ArgumentPreviewCard({
-  argument,
+function IssueCard({
+  issue,
   onOpen,
+  onNewStarter,
 }: {
-  argument: PublishedArgument;
+  issue: Issue;
   onOpen: () => void;
+  onNewStarter: () => void;
 }) {
-  const sourceCount = argument.sources.length;
-  const preview =
-    argument.text.length > 180
-      ? `${argument.text.slice(0, 180).trim()}…`
-      : argument.text;
-
   return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="group w-full rounded-xl border border-[#e4e4e0] bg-white p-5 text-left shadow-[0_1px_2px_rgba(0,0,0,0.02)] transition-colors hover:border-[#d8d8d4] hover:bg-[#fdfdfc]"
-    >
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#ececea] text-[11px] font-medium text-[#5a5a58]">
-            {argument.author
-              .split(" ")
-              .map((n) => n[0])
-              .join("")}
-          </div>
-          <div>
-            <p className="text-[13px] font-medium text-[#2a2a28]">
-              {argument.author}
-            </p>
-            <p className="text-[11px] text-[#9a9a96]">{argument.postedAt}</p>
-          </div>
+    <article className="group overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/50 transition-all hover:border-zinc-700 hover:bg-zinc-900/80">
+      <button type="button" onClick={onOpen} className="w-full px-5 py-4 text-left">
+        <div className="mb-2.5 flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+            {issue.category}
+          </span>
+          {issue.isHot && (
+            <span className="inline-flex items-center gap-1 rounded-md bg-orange-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-orange-400">
+              <Flame className="h-3 w-3" strokeWidth={2.5} />
+              Hot
+            </span>
+          )}
+          <span className="text-[11px] text-zinc-600">{issue.lastActive}</span>
         </div>
-        <span className="flex items-center gap-1 text-[11px] text-[#7a9cc4]">
-          <FileText className="h-3 w-3" strokeWidth={1.75} />
-          {sourceCount} source{sourceCount === 1 ? "" : "s"}
-        </span>
+
+        <h2 className="mb-2 text-[17px] font-bold leading-snug text-zinc-50 group-hover:text-white sm:text-[18px]">
+          {issue.title}
+        </h2>
+        <p className="mb-3 line-clamp-2 text-[13px] leading-relaxed text-zinc-400">
+          {issue.description}
+        </p>
+
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-zinc-600">
+          <span className="inline-flex items-center gap-1.5 font-medium text-zinc-500">
+            <span aria-hidden>🪑</span>
+            {formatDeskBangs(issue.deskBangs)}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <MessageSquare className="h-3.5 w-3.5" strokeWidth={2} />
+            {issue.starterCount} starters · {issue.responseCount} replies
+          </span>
+        </div>
+      </button>
+
+      <div className="flex border-t border-zinc-800">
+        <button
+          type="button"
+          onClick={onOpen}
+          className="flex-1 py-2.5 text-[12px] font-semibold text-zinc-400 transition-colors hover:bg-zinc-800/50 hover:text-zinc-100"
+        >
+          Open thread
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onNewStarter();
+          }}
+          className="flex flex-1 items-center justify-center gap-1.5 border-l border-zinc-800 py-2.5 text-[12px] font-semibold text-teal-400 transition-colors hover:bg-teal-500/10"
+        >
+          <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
+          Starter
+        </button>
       </div>
-
-      <p className="mb-4 text-[15px] leading-relaxed text-[#3a3a38]">
-        {preview}
-      </p>
-
-      <span className="inline-flex items-center gap-1 text-[12px] font-medium text-[#5a5a58] group-hover:text-[#1a1a18]">
-        Read argument
-        <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-      </span>
-    </button>
+    </article>
   );
 }
 
-export function DebateFeed({ onOpenArgument, onWrite }: DebateFeedProps) {
+export function DebateFeed({ onOpenIssue, onNewStarter }: DebateFeedProps) {
+  const hotIssues = getHotIssues();
+  const otherIssues = MOCK_ISSUES.filter((i) => !i.isHot);
+
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-8 lg:px-8">
-      <div className="mb-8">
-        <p className="mb-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-[#9a9a96]">
-          Motion
-        </p>
-        <h1 className="text-2xl font-medium leading-snug tracking-tight text-[#1a1a18] sm:text-[28px]">
-          {MOTION}
-        </h1>
-        <p className="mt-3 max-w-xl text-[14px] leading-relaxed text-[#6a6a66]">
-          {MOCK_PUBLISHED_ARGUMENTS.length} arguments posted. Sourced claims are
-          color-mapped to their references in each post.
-        </p>
-      </div>
+    <div className="mx-auto flex w-full max-w-5xl gap-8 px-4 py-6 lg:px-0">
+      <main className="min-w-0 flex-1">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold tracking-tight text-zinc-50">
+            Popping now
+          </h1>
+          <p className="mt-1 text-[13px] text-zinc-500">
+            Live debates · vetted arguments · desk bangs
+          </p>
+        </div>
 
-      <div className="mb-6 flex items-center justify-between gap-4">
-        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#9a9a96]">
-          Arguments
-        </p>
-        <button
-          type="button"
-          onClick={onWrite}
-          className="rounded-lg border border-[#d8d8d4] bg-[#1a1a18] px-3.5 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-[#2a2a28]"
-        >
-          Write yours
-        </button>
-      </div>
+        <div className="mb-5 flex gap-4 border-b border-zinc-800">
+          {(["hot", "new", "top"] as const).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              className={`-mb-px border-b-2 pb-2.5 text-[13px] font-semibold capitalize transition-colors ${
+                tab === "hot"
+                  ? "border-teal-400 text-zinc-50"
+                  : "border-transparent text-zinc-600 hover:text-zinc-400"
+              }`}
+            >
+              {tab === "hot" ? "Popping" : tab}
+            </button>
+          ))}
+        </div>
 
-      <div className="flex flex-col gap-4">
-        {MOCK_PUBLISHED_ARGUMENTS.map((argument) => (
-          <ArgumentPreviewCard
-            key={argument.id}
-            argument={argument}
-            onOpen={() => onOpenArgument(argument.id)}
-          />
-        ))}
-      </div>
+        <section className="mb-10">
+          <div className="flex flex-col gap-3">
+            {hotIssues.map((issue) => (
+              <IssueCard
+                key={issue.id}
+                issue={issue}
+                onOpen={() => onOpenIssue(issue.id)}
+                onNewStarter={() => onNewStarter(issue.id)}
+              />
+            ))}
+          </div>
+        </section>
+
+        {otherIssues.length > 0 && (
+          <section>
+            <h2 className="mb-3 text-[11px] font-bold uppercase tracking-widest text-zinc-600">
+              More
+            </h2>
+            <div className="flex flex-col gap-3">
+              {otherIssues.map((issue) => (
+                <IssueCard
+                  key={issue.id}
+                  issue={issue}
+                  onOpen={() => onOpenIssue(issue.id)}
+                  onNewStarter={() => onNewStarter(issue.id)}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+      </main>
+
+      <aside className="hidden w-[260px] shrink-0 lg:block">
+        <div className="sticky top-[65px] rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
+          <h3 className="mb-2 text-[13px] font-bold text-zinc-200">
+            How it works
+          </h3>
+          <div className="space-y-3 text-[12px] leading-relaxed text-zinc-500">
+            <p>
+              <span className="font-semibold text-zinc-400">Starters</span> open
+              a position.{" "}
+              <span className="font-semibold text-zinc-400">Replies</span> nest
+              under any post — like Threads.
+            </p>
+            <p>
+              Every post is reviewed before publishing. Attach sources, dispute
+              flags, post anyway.
+            </p>
+            <p>
+              <span className="font-semibold text-teal-400/90">🪑 Desk bang</span>{" "}
+              when someone lands a point.
+            </p>
+          </div>
+        </div>
+      </aside>
     </div>
   );
 }
