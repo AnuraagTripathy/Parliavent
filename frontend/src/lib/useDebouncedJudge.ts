@@ -4,18 +4,18 @@ import { useEffect, useRef, useState } from "react";
 import {
   fetchJudge,
   JUDGE_DEBOUNCE_MS,
+  JUDGE_ERROR_MESSAGE,
   JUDGE_THREAD_ID,
   mergeFindings,
 } from "@/lib/api/judge";
 import type { CheckingState, Finding } from "@/lib/types";
-
-const JUDGE_ERROR_MESSAGE = "Couldn't refresh review. Your text is safe.";
 
 export function useDebouncedJudge(text: string) {
   const [findings, setFindings] = useState<Finding[]>([]);
   const [checkingState, setCheckingState] = useState<CheckingState>("idle");
   const [judgeError, setJudgeError] = useState<string | null>(null);
   const isFirstCheck = useRef(true);
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -23,6 +23,7 @@ export function useDebouncedJudge(text: string) {
     isFirstCheck.current = false;
 
     const timeoutId = window.setTimeout(async () => {
+      const requestId = ++requestIdRef.current;
       setCheckingState("checking");
       setJudgeError(null);
 
@@ -34,13 +35,19 @@ export function useDebouncedJudge(text: string) {
           signal: controller.signal,
         });
 
+        if (controller.signal.aborted || requestId !== requestIdRef.current) {
+          return;
+        }
+
         setFindings((previous) => mergeFindings(previous, nextFindings, text));
         setCheckingState("complete");
       } catch {
-        if (!controller.signal.aborted) {
-          setJudgeError(JUDGE_ERROR_MESSAGE);
-          setCheckingState("complete");
+        if (controller.signal.aborted || requestId !== requestIdRef.current) {
+          return;
         }
+
+        setJudgeError(JUDGE_ERROR_MESSAGE);
+        setCheckingState("complete");
       }
     }, delay);
 

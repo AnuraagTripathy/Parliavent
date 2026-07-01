@@ -1,16 +1,35 @@
 # Parliavent architecture
 
-## App type
+## Monorepo layout
 
-Next.js app with TypeScript and Tailwind.
+```
+parliavent/
+├── docs/                    Product specs, API contract, build plan
+├── frontend/                Next.js client (TypeScript, Tailwind)
+│   ├── src/
+│   │   ├── app/
+│   │   ├── components/debate/
+│   │   └── lib/
+│   ├── public/
+│   └── package.json
+└── backend/                 Express API server
+    ├── src/
+    │   ├── index.ts
+    │   ├── routes/
+    │   ├── types.ts
+    │   └── mockJudge.ts
+    └── package.json
+```
 
-No shadcn.
+## Frontend
 
-Use custom components.
+Next.js app with TypeScript and Tailwind. No shadcn — custom components only.
 
-## State model
+Default dev URL: `http://localhost:3000`
 
-The app should maintain:
+### State model
+
+The frontend should maintain:
 
 - argumentText
 - findings
@@ -18,6 +37,48 @@ The app should maintain:
 - disputedFindings
 - currentView: composer | review | published
 - checkingState: idle | checking | complete
+
+### Frontend file structure
+
+```
+frontend/src/app/page.tsx
+frontend/src/app/globals.css
+frontend/src/app/layout.tsx
+
+frontend/src/components/debate/DebateApp.tsx
+frontend/src/components/debate/ComposerShell.tsx
+frontend/src/components/debate/ArgumentEditor.tsx
+frontend/src/components/debate/FindingsPanel.tsx
+frontend/src/components/debate/FindingCard.tsx
+frontend/src/components/debate/ReadinessBar.tsx
+frontend/src/components/debate/SourcePopover.tsx
+frontend/src/components/debate/PublishedArgumentView.tsx
+frontend/src/components/debate/DebateFeed.tsx
+frontend/src/components/debate/IssueThread.tsx
+frontend/src/components/debate/ThreadBranch.tsx
+
+frontend/src/lib/types.ts
+frontend/src/lib/mockJudge.ts
+frontend/src/lib/applyUserEdit.ts
+frontend/src/lib/highlightText.ts
+frontend/src/lib/readiness.ts
+```
+
+## Backend
+
+Express API server. Default dev URL: `http://localhost:3001`
+
+Hosts the judge and evidence endpoints. The frontend should call the backend over HTTP — not import judge logic directly once Phase 5 is complete.
+
+### Backend file structure
+
+```
+backend/src/index.ts
+backend/src/types.ts
+backend/src/mockJudge.ts
+backend/src/routes/judge.ts
+backend/src/routes/evidence.ts
+```
 
 ## Core types
 
@@ -56,27 +117,7 @@ Finding:
 - selectedSourceId optional
 - disputeReason optional
 
-## File structure
-
-Use this structure:
-
-/src/app/page.tsx
-/src/app/globals.css
-
-/src/components/debate/DebateApp.tsx
-/src/components/debate/ComposerHeader.tsx
-/src/components/debate/ArgumentEditor.tsx
-/src/components/debate/FindingsPanel.tsx
-/src/components/debate/FindingCard.tsx
-/src/components/debate/ReadinessBar.tsx
-/src/components/debate/SourcePopover.tsx
-/src/components/debate/PublishedView.tsx
-
-/src/lib/types.ts
-/src/lib/mockJudge.ts
-/src/lib/applyUserEdit.ts
-/src/lib/highlightText.ts
-/src/lib/readiness.ts
+Shared between frontend and backend. Backend defines canonical API types in `backend/src/types.ts`. Frontend mirrors them in `frontend/src/lib/types.ts` until a shared package is introduced.
 
 ## Important implementation rule
 
@@ -86,11 +127,13 @@ Do not directly mutate the argument text from a finding card unless the user cli
 
 Use a function like:
 
+```ts
 applyUserApprovedEdit({
   text,
   spanText,
   replacement
 })
+```
 
 This replaces only the intended span.
 
@@ -117,38 +160,40 @@ For MVP:
 
 Do not call a real model yet.
 
-## Future API design
+## API boundary
 
-Later add:
+The backend exposes:
 
+```
 POST /api/judge
+POST /api/evidence/search
+GET  /health
+```
 
-Input:
-{
-  text: string;
-  mode: "open_floor" | "structured_debate" | "formal_motion";
-}
+See `docs/api-contract.md` for full request/response shapes.
 
-Output:
-{
-  findings: Finding[];
-}
+For now, the frontend still uses `frontend/src/lib/mockJudge.ts` directly. The backend returns matching mock findings from `backend/src/mockJudge.ts`.
 
-For now, use mockJudge.ts.
+## Current implementation status
 
-## Current transition
+Parliavent currently has:
 
-The app has completed the static prototype, interactions, and published view.
+- Static composer/review prototype
+- Finding interactions
+- Published view
+- Next.js TypeScript backend route at `/src/app/api/judge/route.ts`
+- Mock judge API returning findings based on known spans
+- Debounced real-time checking from the frontend
 
-Next architectural step:
-Move judge analysis behind /api/judge.
+The current judge is still mock-based. It is API-shaped so the internals can later be replaced with a real LLM judge without rewriting the frontend.
 
-Do not jump directly from local mock data to full AI + web search.
+## Current judge flow
 
-Correct order:
-1. Local mock data
-2. Mock API route
-3. Debounced frontend calls
-4. Real structured LLM judge
-5. Evidence search
-6. Persistence/database
+1. User edits argument text.
+2. Frontend waits for the debounce window.
+3. Frontend sends text to `POST /api/judge`.
+4. API returns matching findings.
+5. Frontend merges returned findings with existing finding state.
+6. Existing statuses such as `source_attached`, `disputed`, and `marked_opinion` are preserved when the same finding still exists.
+7. If a span disappears from the text, the corresponding finding disappears.
+8. If no findings remain, the UI shows a clean state.

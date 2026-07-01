@@ -1,5 +1,13 @@
 # Parliavent MVP scope
 
+## Repository layout
+
+```
+docs/        Product specs (repo root)
+frontend/    Next.js client app
+backend/     Express API (judge + evidence)
+```
+
 ## MVP goal
 
 Build one polished interactive prototype.

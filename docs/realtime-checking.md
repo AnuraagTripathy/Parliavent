@@ -42,3 +42,19 @@ Later:
 - Run LLM judge after debounce.
 - Run evidence search only for factual claims.
 - Show evidence search as a slower secondary state.
+
+## Implemented behavior
+
+The app now calls `POST /api/judge` after the user stops typing.
+
+The frontend preserves resolution state when the same finding id remains present across judge runs.
+
+Preserved fields:
+- status
+- selectedSourceId
+- disputeReason
+
+If the relevant span disappears from the argument, the finding is removed.
+
+If no findings are returned, the judge panel shows:
+"Nothing to flag. Ready to post."

@@ -1,5 +1,7 @@
 # Parliavent design direction
 
+Applies to **`frontend/`** — all UI lives in the Next.js client.
+
 ## Overall feel
 
 Parliavent should feel cool, slick, modern, and credible.
@@ -23,10 +25,10 @@ It should not feel like:
 - Custom UI, no shadcn.
 - Tailwind is allowed.
 - Use a modern grotesk/system sans-serif stack.
-- Cool neutral gray/white surfaces.
-- Hairline borders.
+- **Current direction:** dark zinc surfaces, teal accents, bold type — edgy and readable.
+- Hairline borders on `zinc-800`.
 - Generous spacing.
-- Soft rounded corners.
+- Soft rounded corners on cards; sharper on chips and buttons.
 - Very subtle shadows only.
 - Muted colors.
 - No loud gradients.

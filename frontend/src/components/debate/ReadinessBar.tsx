@@ -6,16 +6,20 @@ import { getReadiness } from "@/lib/readiness";
 
 interface ReadinessBarProps {
   findings: Finding[];
+  judgeError?: string | null;
   onPost: () => void;
   postLabel?: string;
 }
 
 export function ReadinessBar({
   findings,
+  judgeError = null,
   onPost,
   postLabel = "Post",
 }: ReadinessBarProps) {
-  const { resolved, total, percent, label } = getReadiness(findings);
+  const { resolved, total, percent, label } = getReadiness(findings, {
+    judgeUnavailable: Boolean(judgeError),
+  });
 
   return (
     <footer className="fixed inset-x-0 bottom-0 z-10 border-t border-zinc-800 bg-zinc-950/95 backdrop-blur-md lg:sticky lg:bottom-0">

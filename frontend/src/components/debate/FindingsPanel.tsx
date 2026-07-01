@@ -8,6 +8,9 @@ interface FindingsPanelProps {
   findings: Finding[];
   checkingState?: CheckingState;
   judgeError?: string | null;
+  pendingOverlapApply?: string | null;
+  onConfirmOverlapApply?: () => void;
+  onCancelOverlapApply?: () => void;
   onUseSuggestion: (findingId: string) => void;
   onKeepAsIs: (findingId: string) => void;
   onAttachSource: (findingId: string, sourceId: string) => void;
@@ -19,6 +22,9 @@ export function FindingsPanel({
   findings,
   checkingState = "complete",
   judgeError = null,
+  pendingOverlapApply = null,
+  onConfirmOverlapApply,
+  onCancelOverlapApply,
   onUseSuggestion,
   onKeepAsIs,
   onAttachSource,
@@ -27,7 +33,10 @@ export function FindingsPanel({
 }: FindingsPanelProps) {
   const isChecking = checkingState === "checking";
   const showEmptyState =
-    !isChecking && checkingState === "complete" && findings.length === 0;
+    !isChecking &&
+    checkingState === "complete" &&
+    findings.length === 0 &&
+    !judgeError;
 
   return (
     <motion.div
@@ -55,6 +64,31 @@ export function FindingsPanel({
         <p className="mb-3 text-[12px] text-[#9a7a6a]" role="status">
           {judgeError}
         </p>
+      )}
+
+      {pendingOverlapApply && (
+        <div className="mb-3 rounded-lg border border-[#ebe3d4] bg-[#faf8f3] px-3.5 py-3">
+          <p className="mb-2.5 text-[12px] leading-relaxed text-[#6a6a66]">
+            This edit may also resolve another review item because the
+            highlighted text overlaps.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={onConfirmOverlapApply}
+              className="rounded-md border border-[#1a1a18] bg-[#1a1a18] px-2.5 py-1.5 text-[11px] font-medium text-white transition-colors hover:bg-[#2a2a28]"
+            >
+              Apply anyway
+            </button>
+            <button
+              type="button"
+              onClick={onCancelOverlapApply}
+              className="rounded-md border border-[#e4e4e0] bg-white px-2.5 py-1.5 text-[11px] font-medium text-[#6a6a66] transition-colors hover:border-[#d0d0cc]"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
       )}
 
       {showEmptyState && (

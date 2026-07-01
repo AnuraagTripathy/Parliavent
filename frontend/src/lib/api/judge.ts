@@ -1,7 +1,10 @@
 import type { Finding, JudgeMode, JudgeResponse } from "@/lib/types";
+import { parseJudgeResponse } from "@/lib/validateJudgeResponse";
 
 export const JUDGE_DEBOUNCE_MS = 900;
 export const JUDGE_THREAD_ID = "cars-downtown";
+export const JUDGE_ERROR_MESSAGE =
+  "Couldn't refresh review. Your draft is safe.";
 
 export interface FetchJudgeParams {
   text: string;
@@ -69,5 +72,11 @@ export async function fetchJudge({
     throw new Error(`Judge request failed (${response.status})`);
   }
 
-  return response.json() as Promise<JudgeResponse>;
+  const data: unknown = await response.json();
+  const parsed = parseJudgeResponse(data);
+  if (!parsed) {
+    throw new Error("Invalid judge response");
+  }
+
+  return parsed;
 }

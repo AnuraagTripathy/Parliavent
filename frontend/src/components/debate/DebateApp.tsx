@@ -5,6 +5,7 @@ import { applyUserApprovedEdit } from "@/lib/applyUserEdit";
 import { buildPublishedArgument } from "@/lib/buildPublishedArgument";
 import { citationsFromFindings, sourcesFromFindings } from "@/lib/citationsFromFindings";
 import { SEED_ARGUMENT, SEED_RESPONSE } from "@/lib/mockJudge";
+import { getOverlappingOpenFindings } from "@/lib/spanOverlap";
 import { useDebouncedJudge } from "@/lib/useDebouncedJudge";
 import type {
   ComposerContext,
@@ -31,20 +32,26 @@ export function DebateApp({ context, onBack, onPosted, onFinished }: DebateAppPr
   const { findings, setFindings, checkingState, judgeError } =
     useDebouncedJudge(argumentText);
   const [currentView, setCurrentView] = useState<CurrentView>("composer");
+  const [pendingOverlapApply, setPendingOverlapApply] = useState<string | null>(
+    null,
+  );
 
   const citations = useMemo(() => citationsFromFindings(findings), [findings]);
   const attachedSources = useMemo(() => sourcesFromFindings(findings), [findings]);
 
-  const updateFinding = useCallback((findingId: string, patch: Partial<Finding>) => {
-    setFindings((prev) =>
-      prev.map((f) => (f.id === findingId ? { ...f, ...patch } : f)),
-    );
-  }, []);
+  const updateFinding = useCallback(
+    (findingId: string, patch: Partial<Finding>) => {
+      setFindings((prev) =>
+        prev.map((f) => (f.id === findingId ? { ...f, ...patch } : f)),
+      );
+    },
+    [setFindings],
+  );
 
-  const applySuggestion = useCallback((findingId: string) => {
-    setFindings((prev) => {
-      const finding = prev.find((f) => f.id === findingId);
-      if (!finding?.suggestedRewrite) return prev;
+  const applySuggestion = useCallback(
+    (findingId: string) => {
+      const finding = findings.find((f) => f.id === findingId);
+      if (!finding?.suggestedRewrite) return;
 
       setArgumentText((text) =>
         applyUserApprovedEdit({
@@ -54,11 +61,31 @@ export function DebateApp({ context, onBack, onPosted, onFinished }: DebateAppPr
         }),
       );
 
-      return prev.map((f) =>
-        f.id === findingId ? { ...f, status: "resolved" as const } : f,
+      setFindings((prev) =>
+        prev.map((f) =>
+          f.id === findingId ? { ...f, status: "resolved" as const } : f,
+        ),
       );
-    });
-  }, []);
+      setPendingOverlapApply(null);
+    },
+    [findings, setFindings],
+  );
+
+  const requestApplySuggestion = useCallback(
+    (findingId: string) => {
+      const finding = findings.find((f) => f.id === findingId);
+      if (!finding?.suggestedRewrite) return;
+
+      const overlapping = getOverlappingOpenFindings(finding, findings);
+      if (overlapping.length > 0) {
+        setPendingOverlapApply(findingId);
+        return;
+      }
+
+      applySuggestion(findingId);
+    },
+    [findings, applySuggestion],
+  );
 
   const keepAsIs = useCallback(
     (findingId: string) => {
@@ -140,7 +167,14 @@ export function DebateApp({ context, onBack, onPosted, onFinished }: DebateAppPr
             findings={findings}
             checkingState={checkingState}
             judgeError={judgeError}
-            onUseSuggestion={applySuggestion}
+            pendingOverlapApply={pendingOverlapApply}
+            onConfirmOverlapApply={() => {
+              if (pendingOverlapApply) {
+                applySuggestion(pendingOverlapApply);
+              }
+            }}
+            onCancelOverlapApply={() => setPendingOverlapApply(null)}
+            onUseSuggestion={requestApplySuggestion}
             onKeepAsIs={keepAsIs}
             onAttachSource={attachSource}
             onMarkAsOpinion={markAsOpinion}
@@ -151,6 +185,7 @@ export function DebateApp({ context, onBack, onPosted, onFinished }: DebateAppPr
 
       <ReadinessBar
         findings={findings}
+        judgeError={judgeError}
         onPost={handlePost}
         postLabel={context.mode === "response" ? "Post response" : "Post starter"}
       />
