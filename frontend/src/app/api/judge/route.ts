@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { judgeText } from "@/lib/mockJudge";
+import { analyzeArgument } from "@/lib/judge/analyzeArgument";
 import type { JudgeMode } from "@/lib/types";
 
 const VALID_MODES: JudgeMode[] = [
@@ -21,7 +21,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { text, mode } = body as { text?: unknown; mode?: unknown };
+  const { text, mode, threadId } = body as {
+    text?: unknown;
+    mode?: unknown;
+    threadId?: unknown;
+  };
 
   if (typeof text !== "string") {
     return NextResponse.json({ error: "text is required" }, { status: 400 });
@@ -31,5 +35,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid mode" }, { status: 400 });
   }
 
-  return NextResponse.json({ findings: judgeText(text) });
+  if (threadId !== undefined && typeof threadId !== "string") {
+    return NextResponse.json({ error: "Invalid threadId" }, { status: 400 });
+  }
+
+  try {
+    const findings = await analyzeArgument({
+      text,
+      mode: mode as JudgeMode,
+      threadId: typeof threadId === "string" ? threadId : undefined,
+    });
+
+    return NextResponse.json({ findings });
+  } catch (error) {
+    console.error("[POST /api/judge]", error);
+    return NextResponse.json(
+      { error: "Judge analysis failed" },
+      { status: 500 },
+    );
+  }
 }

@@ -1,7 +1,8 @@
 import type { Finding, JudgeMode, JudgeResponse } from "@/lib/types";
 import { parseJudgeResponse } from "@/lib/validateJudgeResponse";
 
-export const JUDGE_DEBOUNCE_MS = 900;
+export const JUDGE_DEBOUNCE_MS = 1500;
+export const JUDGE_MIN_CHARS = 40;
 export const JUDGE_THREAD_ID = "cars-downtown";
 export const JUDGE_ERROR_MESSAGE =
   "Couldn't refresh review. Your draft is safe.";

@@ -11,12 +11,23 @@ const RESOLVED_STATUSES = new Set<Finding["status"]>([
 export interface ReadinessOptions {
   /** Judge failed and there are no findings to review — do not show a clean ready state. */
   judgeUnavailable?: boolean;
+  /** Argument is below the minimum length for judge review. */
+  isTooShort?: boolean;
 }
 
 export function getReadiness(
   findings: Finding[],
   options?: ReadinessOptions,
 ): ReadinessResult {
+  if (options?.isTooShort && findings.length === 0) {
+    return {
+      resolved: 0,
+      total: 0,
+      percent: 0,
+      label: "Write more for review",
+    };
+  }
+
   if (options?.judgeUnavailable && findings.length === 0) {
     return {
       resolved: 0,

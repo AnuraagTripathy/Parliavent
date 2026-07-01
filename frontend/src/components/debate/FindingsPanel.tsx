@@ -8,6 +8,8 @@ interface FindingsPanelProps {
   findings: Finding[];
   checkingState?: CheckingState;
   judgeError?: string | null;
+  isTooShort?: boolean;
+  onCheckNow?: () => void;
   pendingOverlapApply?: string | null;
   onConfirmOverlapApply?: () => void;
   onCancelOverlapApply?: () => void;
@@ -22,6 +24,8 @@ export function FindingsPanel({
   findings,
   checkingState = "complete",
   judgeError = null,
+  isTooShort = false,
+  onCheckNow,
   pendingOverlapApply = null,
   onConfirmOverlapApply,
   onCancelOverlapApply,
@@ -32,11 +36,14 @@ export function FindingsPanel({
   onDispute,
 }: FindingsPanelProps) {
   const isChecking = checkingState === "checking";
+  const showShortTextState =
+    isTooShort && !isChecking && checkingState === "complete" && !judgeError;
   const showEmptyState =
     !isChecking &&
     checkingState === "complete" &&
     findings.length === 0 &&
-    !judgeError;
+    !judgeError &&
+    !isTooShort;
 
   return (
     <motion.div
@@ -49,15 +56,26 @@ export function FindingsPanel({
         <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#9a9a96]">
           Judge review
         </p>
-        {isChecking ? (
-          <span className="text-[11px] text-[#8a8a86] animate-pulse">
-            Checking argument...
-          </span>
-        ) : (
-          <span className="rounded-full border border-[#e8e8e4] bg-white px-2 py-0.5 text-[11px] text-[#8a8a86]">
-            {findings.length} findings
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {isChecking ? (
+            <span className="text-[11px] text-[#8a8a86] animate-pulse">
+              Checking argument...
+            </span>
+          ) : (
+            <span className="rounded-full border border-[#e8e8e4] bg-white px-2 py-0.5 text-[11px] text-[#8a8a86]">
+              {findings.length} findings
+            </span>
+          )}
+          {onCheckNow && !isChecking && (
+            <button
+              type="button"
+              onClick={onCheckNow}
+              className="text-[11px] font-medium text-[#7a7a76] underline decoration-[#d0d0cc] underline-offset-2 transition-colors hover:text-[#4a4a48]"
+            >
+              Check now
+            </button>
+          )}
+        </div>
       </div>
 
       {judgeError && (
@@ -88,6 +106,14 @@ export function FindingsPanel({
               Cancel
             </button>
           </div>
+        </div>
+      )}
+
+      {showShortTextState && (
+        <div className="rounded-xl border border-dashed border-[#e0e0dc] bg-[#fafaf8] px-4 py-6 text-center">
+          <p className="text-[13px] font-medium text-[#6a6a66]">
+            Write a little more for review.
+          </p>
         </div>
       )}
 

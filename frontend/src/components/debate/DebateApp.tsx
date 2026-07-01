@@ -29,8 +29,14 @@ interface DebateAppProps {
 export function DebateApp({ context, onBack, onPosted, onFinished }: DebateAppProps) {
   const initialText = context.mode === "response" ? SEED_RESPONSE : SEED_ARGUMENT;
   const [argumentText, setArgumentText] = useState(initialText);
-  const { findings, setFindings, checkingState, judgeError } =
-    useDebouncedJudge(argumentText);
+  const {
+    findings,
+    setFindings,
+    checkingState,
+    judgeError,
+    isTooShort,
+    checkNow,
+  } = useDebouncedJudge(argumentText);
   const [currentView, setCurrentView] = useState<CurrentView>("composer");
   const [pendingOverlapApply, setPendingOverlapApply] = useState<string | null>(
     null,
@@ -167,6 +173,8 @@ export function DebateApp({ context, onBack, onPosted, onFinished }: DebateAppPr
             findings={findings}
             checkingState={checkingState}
             judgeError={judgeError}
+            isTooShort={isTooShort}
+            onCheckNow={checkNow}
             pendingOverlapApply={pendingOverlapApply}
             onConfirmOverlapApply={() => {
               if (pendingOverlapApply) {
@@ -186,6 +194,7 @@ export function DebateApp({ context, onBack, onPosted, onFinished }: DebateAppPr
       <ReadinessBar
         findings={findings}
         judgeError={judgeError}
+        isTooShort={isTooShort}
         onPost={handlePost}
         postLabel={context.mode === "response" ? "Post response" : "Post starter"}
       />

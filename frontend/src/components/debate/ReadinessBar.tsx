@@ -7,6 +7,7 @@ import { getReadiness } from "@/lib/readiness";
 interface ReadinessBarProps {
   findings: Finding[];
   judgeError?: string | null;
+  isTooShort?: boolean;
   onPost: () => void;
   postLabel?: string;
 }
@@ -14,11 +15,13 @@ interface ReadinessBarProps {
 export function ReadinessBar({
   findings,
   judgeError = null,
+  isTooShort = false,
   onPost,
   postLabel = "Post",
 }: ReadinessBarProps) {
   const { resolved, total, percent, label } = getReadiness(findings, {
     judgeUnavailable: Boolean(judgeError),
+    isTooShort,
   });
 
   return (
