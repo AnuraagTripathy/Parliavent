@@ -53,10 +53,10 @@ export function LandingPage({ onEnterDebates }: LandingPageProps) {
 
       <FadeIn className="w-full px-4 py-20 md:px-8 lg:px-12 xl:px-16">
         <div className="mx-auto mb-14 max-w-3xl text-center">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+          <p className="mb-3 font-display text-[11px] font-medium uppercase tracking-[0.24em] text-primary">
             What this is
           </p>
-          <h2 className="mb-5 font-serif text-3xl font-medium tracking-tight text-foreground md:text-4xl">
+          <h2 className="mb-5 font-serif text-3xl font-semibold tracking-[-0.02em] text-foreground md:text-4xl">
             A forum for arguments worth having
           </h2>
           <p className="text-base leading-relaxed text-muted-foreground md:text-lg">
@@ -88,10 +88,10 @@ export function LandingPage({ onEnterDebates }: LandingPageProps) {
       </FadeIn>
 
       <FadeIn className="w-full border-t border-border bg-muted/30 px-4 py-20 md:px-8 lg:px-12 xl:px-16">
-        <p className="mb-3 text-center text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+        <p className="mb-3 text-center font-display text-[11px] font-medium uppercase tracking-[0.24em] text-primary">
           How we keep it civil
         </p>
-        <h2 className="mb-12 text-center font-serif text-3xl font-medium text-foreground md:text-4xl">
+        <h2 className="mb-12 text-center font-serif text-3xl font-semibold tracking-[-0.02em] text-foreground md:text-4xl">
           Built for understanding
         </h2>
         <StaggerGroup className="grid w-full gap-6 md:grid-cols-3">
@@ -122,10 +122,10 @@ export function LandingPage({ onEnterDebates }: LandingPageProps) {
       <FadeIn className="w-full px-4 py-16 md:px-8 lg:px-12 xl:px-16">
         <div className="mb-10 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+            <p className="mb-2 font-display text-[11px] font-medium uppercase tracking-[0.24em] text-primary">
               See it in practice
             </p>
-            <h2 className="font-serif text-3xl font-medium tracking-tight text-foreground md:text-4xl">
+            <h2 className="font-serif text-3xl font-semibold tracking-[-0.02em] text-foreground md:text-4xl">
               Live discussions
             </h2>
             <p className="mt-2 max-w-xl text-sm text-muted-foreground">
@@ -183,7 +183,7 @@ export function LandingPage({ onEnterDebates }: LandingPageProps) {
       <FadeIn className="w-full border-t border-border px-4 py-20 md:px-8 lg:px-12 xl:px-16">
         <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
           <BookOpen className="mb-5 h-8 w-8 text-primary/80" />
-          <h2 className="mb-4 font-serif text-2xl font-medium text-foreground md:text-3xl">
+          <h2 className="mb-4 font-serif text-2xl font-semibold tracking-[-0.02em] text-foreground md:text-3xl">
             Leave with more than you came with
           </h2>
           <p className="mb-8 text-base leading-relaxed text-muted-foreground">

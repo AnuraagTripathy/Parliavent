@@ -407,8 +407,8 @@ export function PublishedArgumentView({
                         ))}
                       </div>
                       <p className="text-xs leading-relaxed text-muted-foreground">
-                        The judge flagged a possible fallacy. The author reviewed
-                        it, disagreed, and chose to post anyway.
+                        The author disagreed with the judge&apos;s fallacy flag.
+                        Click a chip to learn what the term means.
                       </p>
                     </div>
                   )}

@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { EvidenceCandidatesList } from "./EvidenceCandidatesList";
+import { FallacyGuideContent } from "./FallacyGuideContent";
 
 interface FindingCardProps {
   finding: Finding;
@@ -227,18 +228,34 @@ export function FindingCard({
             {finding.title}
           </h3>
           {finding.subtitle && (
-            <p className="mt-0.5 text-[11px] text-muted-foreground">{finding.subtitle}</p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">
+              {finding.subtitle}
+            </p>
           )}
         </div>
       </div>
 
-      <p className="mb-3 text-[12px] leading-relaxed text-muted-foreground">
-        {finding.reason}
-      </p>
+      {finding.type !== "fallacy" && (
+        <p className="mb-3 text-[12px] leading-relaxed text-muted-foreground">
+          {finding.reason}
+        </p>
+      )}
 
       <blockquote className="mb-3 rounded border-l-2 border-border bg-muted/40 py-1 pl-2.5 pr-1 text-[11px] italic leading-relaxed text-foreground/70">
         &ldquo;{finding.spanText}&rdquo;
       </blockquote>
+
+      {finding.type === "fallacy" && (
+        <div className="mb-3">
+          <FallacyGuideContent
+            fallacyName={finding.subtitle ?? finding.title}
+            contextNote={finding.reason}
+            flaggedSpan={finding.spanText}
+            judgeExample={finding.example}
+            disputed={finding.status === "disputed"}
+          />
+        </div>
+      )}
 
       {finding.type === "clarity" && hasSuggestedRewrite(finding) && isOpen && (
         <div className="mb-3 rounded-md border border-border bg-muted/40 px-2.5 py-2">
@@ -253,24 +270,6 @@ export function FindingCard({
 
       {finding.type === "fallacy" && fallacyExpanded && (
         <>
-          {finding.subtitle && (
-            <p className="mb-2 text-[11px] text-muted-foreground">
-              <span className="font-medium text-foreground/70">Fallacy: </span>
-              {finding.subtitle}
-            </p>
-          )}
-          {finding.confidence && (
-            <p className="mb-2 text-[11px] text-muted-foreground">
-              <span className="font-medium text-foreground/70">Confidence: </span>
-              {finding.confidence}
-            </p>
-          )}
-          {finding.example && (
-            <p className="mb-3 text-[11px] leading-relaxed text-muted-foreground">
-              <span className="font-medium text-foreground/70">Example: </span>
-              {finding.example}
-            </p>
-          )}
           {finding.suggestedRewrite && (
             <div className="mb-3 rounded-md border border-border bg-muted/40 px-2.5 py-2">
               <p className="mb-1 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
@@ -415,7 +414,7 @@ export function FindingCard({
           <div className="flex flex-wrap gap-2">
             {!fallacyExpanded && (
               <ActionButton onClick={() => setFallacyExpanded(true)}>
-                See fix
+                See suggested fix
               </ActionButton>
             )}
             {fallacyExpanded && finding.suggestedRewrite && (

@@ -56,7 +56,7 @@ export function CTASection({ onStart }: CTASectionProps) {
           >
             <motion.div
               variants={staggerItem}
-              className="mb-8 inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/5 px-4 py-1.5 text-sm font-medium text-primary backdrop-blur-sm"
+              className="mb-8 inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/5 px-5 py-2 font-display text-[11px] font-medium uppercase tracking-[0.24em] text-primary backdrop-blur-sm"
             >
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
@@ -67,15 +67,17 @@ export function CTASection({ onStart }: CTASectionProps) {
 
             <motion.h2
               variants={staggerItem}
-              className="mb-8 font-serif text-5xl font-medium leading-[1.05] tracking-tight text-foreground md:text-7xl lg:text-8xl"
+              className="mb-8 font-serif text-5xl font-semibold leading-[1.06] tracking-[-0.02em] text-foreground md:text-7xl lg:text-[5.25rem]"
             >
               Think together. <br />
-              <span className="text-foreground/75">Not against each other.</span>
+              <span className="font-normal italic text-foreground/70">
+                Not against each other.
+              </span>
             </motion.h2>
 
             <motion.p
               variants={staggerItem}
-              className="mb-12 max-w-2xl text-lg leading-relaxed text-muted-foreground md:text-xl"
+              className="mb-12 max-w-2xl font-serif text-xl font-normal leading-relaxed text-muted-foreground md:text-2xl md:leading-relaxed"
             >
               Parliavent is Reddit for people who want to understand — not dunk.
               High-substance arguments, nested threads, and judge review that

@@ -78,6 +78,8 @@ export interface EvidenceSource {
   rationale?: string;
   /** True only when supportLevel is supports or partially_supports. */
   canAttachAsSupport: boolean;
+  /** Top ranked passages extracted from the source page. */
+  evidencePassages?: string[];
 }
 
 export interface EvidenceSearchRequest {
@@ -92,6 +94,10 @@ export interface EvidenceSearchResponse {
   claimVerdict: ClaimVerdict;
   summary: string;
   sources: EvidenceSource[];
+  /** Flattened top passages used for verification across sources. */
+  evidencePassages?: string[];
+  /** Whether Groq judged from page passages, snippets, or both. */
+  verificationBasis?: "passages" | "snippets" | "mixed";
 }
 
 export interface Finding {

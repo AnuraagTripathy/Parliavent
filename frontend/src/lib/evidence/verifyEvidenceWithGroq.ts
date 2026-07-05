@@ -31,7 +31,8 @@ function extractJsonContent(content: string): unknown {
 export async function verifyEvidenceWithGroq(params: {
   claim: string;
   argumentText?: string;
-  sources: EvidenceSource[];
+  verificationBasis?: "passages" | "snippets" | "mixed";
+  sources: Array<EvidenceSource & { evidencePassages?: string[] }>;
 }): Promise<VerifiedEvidenceResult> {
   const apiKey = getGroqApiKey();
   if (!apiKey) {
@@ -60,6 +61,7 @@ export async function verifyEvidenceWithGroq(params: {
             content: buildEvidenceVerifierUserPrompt({
               claim: params.claim,
               argumentText: params.argumentText,
+              verificationBasis: params.verificationBasis,
               sources: params.sources,
             }),
           },

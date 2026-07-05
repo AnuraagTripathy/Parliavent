@@ -116,6 +116,18 @@ export function normalizeClaimText(claim: string): string {
   return claim.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+/** Normalize a URL for deduplication across search queries. */
+export function normalizeSourceUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.toLowerCase().replace(/^www\./, "");
+    const pathname = parsed.pathname.replace(/\/$/, "") || "/";
+    return `${hostname}${pathname}`;
+  } catch {
+    return url.trim().toLowerCase();
+  }
+}
+
 /** Build a simple keyword query from the claim and optional thread context. */
 export function buildSearchQuery(
   claim: string,

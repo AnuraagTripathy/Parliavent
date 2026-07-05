@@ -53,6 +53,10 @@ export function getEvidenceCacheHit(
     claimKind: entry.response.claimKind,
     claimVerdict: entry.response.claimVerdict,
     summary: entry.response.summary,
+    verificationBasis: entry.response.verificationBasis,
+    evidencePassages: entry.response.evidencePassages
+      ? [...entry.response.evidencePassages]
+      : undefined,
     sources: entry.response.sources.map((source) => ({ ...source })),
   };
 }
@@ -71,6 +75,10 @@ export function setEvidenceCache(
       claimKind: response.claimKind,
       claimVerdict: response.claimVerdict,
       summary: response.summary,
+      verificationBasis: response.verificationBasis,
+      evidencePassages: response.evidencePassages
+        ? [...response.evidencePassages]
+        : undefined,
       sources: response.sources.map((source) => ({ ...source })),
     },
     expiresAt: Date.now() + EVIDENCE_CACHE_TTL_MS,
