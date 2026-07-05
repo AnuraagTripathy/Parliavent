@@ -1,11 +1,12 @@
 import { getPost } from "./mockFeed";
 import type { PublishedArgument } from "./types";
 
+/** Dark-theme citation colors — tuned for #0c0a09 / #171412 backgrounds */
 export const CITATION_PALETTE = [
-  { bg: "#e8eef8", underline: "#7a9cc4", marker: "#5a7a9e", ring: "#dce4ef" },
-  { bg: "#e6f0ec", underline: "#7aab96", marker: "#4a8a72", ring: "#d4e8df" },
-  { bg: "#ebe8f4", underline: "#9a8cc4", marker: "#6a5a9e", ring: "#e0dce8" },
-  { bg: "#f0ebe6", underline: "#b49a7a", marker: "#8a725a", ring: "#e8e0d8" },
+  { bg: "#3b82f6", underline: "#60a5fa", marker: "#93c5fd", ring: "#3b82f6" },
+  { bg: "#10b981", underline: "#34d399", marker: "#6ee7b7", ring: "#10b981" },
+  { bg: "#8b5cf6", underline: "#a78bfa", marker: "#c4b5fd", ring: "#8b5cf6" },
+  { bg: "#f59e0b", underline: "#fbbf24", marker: "#fcd34d", ring: "#f59e0b" },
 ] as const;
 
 export function getCitationColor(sourceIndex: number) {

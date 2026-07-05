@@ -1,0 +1,180 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum DebateMode {
+  open_floor
+  structured_debate
+  formal_motion
+}
+
+enum PostType {
+  starter
+  reply
+}
+
+enum FindingType {
+  claim
+  fallacy
+  clarity
+}
+
+enum FindingStatus {
+  open
+  resolved
+  ignored
+  disputed
+  source_attached
+  marked_opinion
+}
+
+enum ClaimKind {
+  factual
+  opinion
+  mixed
+  unclear
+}
+
+enum ClaimVerdict {
+  supported
+  partially_supported
+  contradicted
+  unsupported
+  too_broad
+  unclear
+}
+
+enum SupportLevel {
+  supports
+  partially_supports
+  contradicts
+  related_only
+  unclear
+}
+
+enum Credibility {
+  high
+  medium
+  low
+}
+
+enum CaveatType {
+  claim_verdict
+  unresolved_review
+}
+
+model Debate {
+  id        String     @id @default(cuid())
+  motion    String
+  slug      String     @unique
+  mode      DebateMode
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  posts     Post[]
+}
+
+model Post {
+  id           String    @id @default(cuid())
+  debateId     String
+  parentPostId String?
+  text         String
+  postType     PostType
+  authorName   String
+  publishedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  debate     Debate    @relation(fields: [debateId], references: [id], onDelete: Cascade)
+  parentPost Post?     @relation("PostReplies", fields: [parentPostId], references: [id])
+  replies    Post[]    @relation("PostReplies")
+  findings   Finding[]
+  caveats    Caveat[]
+
+  @@index([debateId])
+}
+
+model Finding {
+  id               String        @id @default(cuid())
+  postId           String
+  type             FindingType
+  status           FindingStatus @default(open)
+  spanText         String
+  title            String
+  subtitle         String?
+  reason           String
+  confidence       Float?
+  example          String?
+  suggestedRewrite String?
+  claimKind        ClaimKind?
+  disputeReason    String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  post           Post            @relation(fields: [postId], references: [id], onDelete: Cascade)
+  evidenceResult EvidenceResult?
+  findingSources FindingSource[]
+  caveats        Caveat[]
+
+  @@index([postId])
+}
+
+model EvidenceResult {
+  id           String       @id @default(cuid())
+  findingId    String       @unique
+  claimVerdict ClaimVerdict
+  summary      String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  finding Finding @relation(fields: [findingId], references: [id], onDelete: Cascade)
+}
+
+model Source {
+  id          String      @id @default(cuid())
+  title       String
+  publisher   String
+  url         String?
+  snippet     String      @default("")
+  credibility Credibility
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  findingSources FindingSource[]
+}
+
+model FindingSource {
+  id                 String       @id @default(cuid())
+  findingId          String
+  sourceId           String
+  supportLevel       SupportLevel
+  canAttachAsSupport Boolean
+  rationale          String?
+  isAttached         Boolean      @default(false)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  finding Finding @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  source  Source  @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@unique([findingId, sourceId])
+}
+
+model Caveat {
+  id        String     @id @default(cuid())
+  postId    String
+  findingId String?
+  type      CaveatType
+  message   String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  post    Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  finding Finding? @relation(fields: [findingId], references: [id], onDelete: SetNull)
+
+  @@index([postId])
+}

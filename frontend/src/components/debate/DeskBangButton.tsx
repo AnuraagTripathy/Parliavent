@@ -25,7 +25,7 @@ export function DeskBangButton({
       ? size === "sm"
         ? "px-1.5 py-2"
         : "px-2 py-2.5"
-      : "px-2 py-1.5";
+      : "px-2.5 py-1";
 
   return (
     <button
@@ -35,12 +35,12 @@ export function DeskBangButton({
         onToggle();
       }}
       title={banged ? "Withdraw desk bang" : "Bang desk — good point"}
-      className={`group flex shrink-0 items-center justify-center gap-1.5 rounded-lg transition-all ${padding} ${
+      className={`group flex shrink-0 items-center justify-center gap-1.5 rounded-full transition-all ${padding} ${
         layout === "vertical" ? "flex-col" : "flex-row"
       } ${
         banged
-          ? "bg-teal-500/15 text-teal-400 ring-1 ring-teal-500/30"
-          : "text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"
+          ? "bg-primary/10 text-primary ring-1 ring-primary/25"
+          : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
       }`}
     >
       <motion.span
@@ -55,7 +55,7 @@ export function DeskBangButton({
       </motion.span>
       <span
         className={`font-bold tabular-nums ${textSize} ${
-          banged ? "text-teal-400" : "text-zinc-500 group-hover:text-zinc-300"
+          banged ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
         }`}
       >
         {formatDeskBangs(count)}

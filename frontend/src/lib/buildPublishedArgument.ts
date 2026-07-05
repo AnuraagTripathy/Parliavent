@@ -15,6 +15,9 @@ export function buildPublishedArgument(params: {
   kind?: PostKind;
   issueId?: string;
   parentId?: string;
+  id?: string;
+  debateId?: string;
+  dbPostId?: string;
 }): PublishedArgument {
   const sources = sourcesFromFindings(params.findings);
   const citations = citationsFromFindings(params.findings);
@@ -28,7 +31,7 @@ export function buildPublishedArgument(params: {
   const hasOtherOpenFindings = hasOpenNonCaveatedFindings(params.findings);
 
   return {
-    id: `user-${Date.now()}`,
+    id: params.id ?? params.dbPostId ?? `user-${Date.now()}`,
     author: params.author ?? "You",
     postedAt: "Just now",
     text: params.text,
@@ -45,6 +48,8 @@ export function buildPublishedArgument(params: {
     caveats: hasOtherOpenFindings
       ? ["Posted with unresolved review item."]
       : undefined,
+    debateId: params.debateId,
+    dbPostId: params.dbPostId,
   };
 }
 

@@ -1,0 +1,87 @@
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+import { findingToCreateInput } from "@/lib/db/mappers";
+import type { Finding } from "@/lib/types";
+
+function isFinding(value: unknown): value is Finding {
+  if (!value || typeof value !== "object") return false;
+  const f = value as Record<string, unknown>;
+  return (
+    typeof f.id === "string" &&
+    typeof f.type === "string" &&
+    typeof f.status === "string" &&
+    typeof f.spanText === "string" &&
+    typeof f.title === "string" &&
+    typeof f.reason === "string"
+  );
+}
+
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ postId: string }> },
+) {
+  const { postId } = await params;
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  if (!body || typeof body !== "object") {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  const { findings } = body as { findings?: unknown };
+
+  if (!Array.isArray(findings) || !findings.every(isFinding)) {
+    return NextResponse.json(
+      { error: "findings must be an array of valid findings" },
+      { status: 400 },
+    );
+  }
+
+  try {
+    const post = await prisma.post.findUnique({ where: { id: postId } });
+    if (!post) {
+      return NextResponse.json({ error: "Post not found" }, { status: 404 });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      const incomingIds = findings.map((f) => f.id);
+
+      await tx.finding.deleteMany({
+        where: {
+          postId,
+          id: { notIn: incomingIds },
+        },
+      });
+
+      for (const finding of findings) {
+        const data = findingToCreateInput(finding);
+        await tx.finding.upsert({
+          where: { id: finding.id },
+          create: {
+            ...data,
+            postId,
+          },
+          update: data,
+        });
+      }
+    });
+
+    const saved = await prisma.finding.findMany({
+      where: { postId },
+      orderBy: { createdAt: "asc" },
+    });
+
+    return NextResponse.json({ findings: saved });
+  } catch (error) {
+    console.error(`POST /api/posts/${postId}/findings failed:`, error);
+    return NextResponse.json(
+      { error: "Failed to save findings" },
+      { status: 500 },
+    );
+  }
+}

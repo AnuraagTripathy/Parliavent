@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { ArrowLeft, ExternalLink, MessageSquare, ShieldCheck } from "lucide-react";
 import { motion } from "framer-motion";
 import { formatByline } from "@/lib/buildPublishedArgument";
@@ -11,9 +12,18 @@ import {
 import { getIssue } from "@/lib/mockFeed";
 import { getCitationColor } from "@/lib/mockPublishedArguments";
 import { buildSourceIndex, highlightCitations } from "@/lib/highlightCitations";
+import { startersToComments } from "@/lib/postsToCommentTree";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { SkeletonPost } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
+import { cn } from "@/lib/utils";
 import { ContestedChip } from "./ContestedChip";
 import { DeskBangButton } from "./DeskBangButton";
-import { ThreadBranch } from "./ThreadBranch";
+import {
+  ParliaventDebateThread,
+  type DebateCommentMeta,
+} from "./ParliaventDebateThread";
 
 import type { CitationSegment } from "@/lib/highlightCitations";
 import type { PublishedArgument, Source } from "@/lib/types";
@@ -29,14 +39,19 @@ interface PublishedArgumentViewProps {
   onThreadOpen?: (postId: string) => void;
   onThreadDeskBang?: (postId: string) => void;
   posts?: PublishedArgument[];
+  isLoading?: boolean;
 }
 
 function CitationText({
   segments,
   sources,
+  hoveredSourceIndex,
+  onSourceHover,
 }: {
   segments: CitationSegment[];
   sources: Source[];
+  hoveredSourceIndex?: number | null;
+  onSourceHover?: (index: number | null) => void;
 }) {
   return (
     <>
@@ -47,21 +62,31 @@ function CitationText({
           const sourceId = `source-${sources[segment.citationIndex]?.id}`;
 
           return (
-            <span key={i} className="relative">
-              <mark
-                className="rounded-sm underline decoration-2 underline-offset-[3px]"
-                style={{
-                  backgroundColor: `${color.bg}33`,
-                  textDecorationColor: color.underline,
-                }}
-              >
-                {segment.text}
-              </mark>
+            <span
+              key={i}
+              className={cn(
+                "citation-passage",
+                hoveredSourceIndex === segment.citationIndex &&
+                  "citation-passage--active",
+              )}
+              style={
+                {
+                  "--cite-bg": `${color.bg}22`,
+                  "--cite-underline": color.underline,
+                  "--cite-marker": color.marker,
+                } as React.CSSProperties
+              }
+              onMouseEnter={() => onSourceHover?.(segment.citationIndex!)}
+              onMouseLeave={() => onSourceHover?.(null)}
+            >
+              <mark>{segment.text}</mark>
               <a
                 href={`#${sourceId}`}
-                className="ml-0.5 inline-flex align-super text-[10px] font-bold no-underline transition-opacity hover:opacity-70"
+                className="cite-marker ml-0.5 inline-flex align-super text-[11px] font-bold no-underline"
                 style={{ color: color.marker }}
                 aria-label={`Source ${marker}`}
+                onFocus={() => onSourceHover?.(segment.citationIndex!)}
+                onBlur={() => onSourceHover?.(null)}
               >
                 [{marker}]
               </a>
@@ -72,10 +97,10 @@ function CitationText({
         if (segment.caveatMessage) {
           return (
             <span key={i}>
-              <span className="underline decoration-dotted decoration-zinc-600/50 underline-offset-[3px]">
+              <span className="underline decoration-dotted decoration-muted-foreground/50 underline-offset-[3px]">
                 {segment.text}
               </span>
-              <span className="ml-1.5 text-[11px] italic text-zinc-500">
+              <span className="ml-1.5 text-[11px] italic text-muted-foreground">
                 {segment.caveatMessage}
               </span>
             </span>
@@ -83,7 +108,7 @@ function CitationText({
         }
 
         return (
-          <span key={i} className="text-zinc-200">
+          <span key={i} className="text-stone-100">
             {segment.text}
           </span>
         );
@@ -95,9 +120,13 @@ function CitationText({
 function SourceListItem({
   source,
   index,
+  isHighlighted,
+  onSourceHover,
 }: {
   source: Source;
   index: number;
+  isHighlighted?: boolean;
+  onSourceHover?: (index: number | null) => void;
 }) {
   const color = getCitationColor(index);
   const sourceId = `source-${source.id}`;
@@ -108,8 +137,16 @@ function SourceListItem({
       href={source.url ?? "#"}
       target={source.url ? "_blank" : undefined}
       rel={source.url ? "noopener noreferrer" : undefined}
-      className="group scroll-mt-24 rounded-lg border border-zinc-800 bg-zinc-900/60 p-3.5 transition-colors hover:border-zinc-700 hover:bg-zinc-900"
-      style={{ borderLeftColor: color.ring, borderLeftWidth: 2 }}
+      className={cn(
+        "group scroll-mt-24 rounded-lg border border-border bg-card/60 p-3.5 transition-all duration-200 hover:bg-muted/30",
+        isHighlighted && "bg-muted/40 shadow-sm shadow-black/20",
+      )}
+      style={{
+        borderLeftColor: color.ring,
+        borderLeftWidth: isHighlighted ? 3 : 2,
+      }}
+      onMouseEnter={() => onSourceHover?.(index)}
+      onMouseLeave={() => onSourceHover?.(null)}
     >
       <div className="mb-1.5 flex items-center gap-2">
         <span
@@ -121,14 +158,14 @@ function SourceListItem({
         >
           {index + 1}
         </span>
-        <span className="text-[12px] font-medium leading-snug text-zinc-200 group-hover:text-zinc-50">
+        <span className="text-[12px] font-medium leading-snug text-foreground/90 group-hover:text-foreground">
           {source.title}
         </span>
         {source.url && (
-          <ExternalLink className="ml-auto h-3 w-3 shrink-0 text-zinc-600 opacity-0 transition-opacity group-hover:opacity-100" />
+          <ExternalLink className="ml-auto h-3 w-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
         )}
       </div>
-      <p className="pl-7 text-[11px] text-zinc-500">
+      <p className="pl-7 text-[11px] text-muted-foreground">
         {source.publisher}
         {source.isSample && " · sample"}
       </p>
@@ -147,7 +184,11 @@ export function PublishedArgumentView({
   onThreadOpen,
   onThreadDeskBang,
   posts = [],
+  isLoading = false,
 }: PublishedArgumentViewProps) {
+  const [hoveredSourceIndex, setHoveredSourceIndex] = useState<number | null>(
+    null,
+  );
   const sourceIndex = buildSourceIndex(argument);
   const segments = highlightCitations(
     argument.text,
@@ -166,46 +207,64 @@ export function PublishedArgumentView({
     return sum + 1 + countDescendants(node);
   }, 0);
 
+  const replyComments = startersToComments(directReplies, posts);
+  const replyMetaMap = new Map<string, DebateCommentMeta>();
+  for (const post of posts) {
+    replyMetaMap.set(post.id, {
+      deskBangs: post.deskBangs ?? 0,
+      userBanged: post.userBanged ?? false,
+      isStarter: post.kind === "starter",
+      sourceCount: post.sources.length,
+      contestedFallacies: post.contestedFallacies,
+    });
+  }
+  const getReplyMeta = (id: string | number) => replyMetaMap.get(String(id));
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25, ease: "easeOut" }}
-      className={`mx-auto w-full px-4 py-6 lg:px-0 ${
-        isAuthor ? "max-w-2xl" : "max-w-2xl"
-      }`}
+      className="w-full px-4 py-8 md:px-8 lg:px-12 xl:px-16"
     >
+      <div className="grid w-full gap-10 xl:grid-cols-[1fr_minmax(280px,360px)]">
+        <div className="min-w-0">
       <div className="mb-6 flex flex-wrap items-center gap-2">
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={onBack}
-          className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-zinc-500 transition-colors hover:text-zinc-200"
+          className="h-8 px-2 text-[12px] font-semibold text-muted-foreground"
         >
-          <ArrowLeft className="h-3.5 w-3.5" />
+          <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
           {isAuthor ? "Back to edit" : "Back to thread"}
-        </button>
+        </Button>
         {isAuthor && onDone && (
-          <button
-            type="button"
-            onClick={onDone}
-            className="inline-flex items-center rounded-lg bg-zinc-100 px-4 py-1.5 text-[12px] font-bold text-zinc-950 transition-colors hover:bg-white"
-          >
+          <Button size="sm" onClick={onDone} className="h-8 text-[12px] font-bold">
             View in debate
-          </button>
+          </Button>
         )}
         {!isAuthor && onReply && (
-          <button
-            type="button"
+          <Button
+            variant="outline"
+            size="sm"
             onClick={onReply}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-1.5 text-[12px] font-semibold text-zinc-200 transition-colors hover:border-zinc-600 hover:bg-zinc-800"
+            className="h-8 text-[12px] font-semibold"
           >
-            <MessageSquare className="h-3.5 w-3.5" strokeWidth={2} />
+            <MessageSquare className="mr-1.5 h-3.5 w-3.5" strokeWidth={2} />
             Reply
-          </button>
+          </Button>
         )}
       </div>
 
-      <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-600">
+      {isLoading ? (
+        <div className="space-y-4">
+          <Spinner label="Loading saved post…" />
+          <SkeletonPost />
+        </div>
+      ) : (
+        <>
+      <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
         {contextLabel}
       </p>
 
@@ -219,27 +278,33 @@ export function PublishedArgumentView({
           />
         )}
         <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-800 text-[12px] font-bold text-zinc-300 ring-1 ring-zinc-700">
-            {argument.author
-              .split(" ")
-              .map((n) => n[0])
-              .join("")}
-          </div>
+          <Avatar className="h-9 w-9">
+            <AvatarImage
+              src={`https://api.dicebear.com/8.x/lorelei/svg?seed=${encodeURIComponent(argument.author)}`}
+              alt=""
+            />
+            <AvatarFallback className="bg-primary/10 text-[12px] font-bold">
+              {argument.author
+                .split(" ")
+                .map((n) => n[0])
+                .join("")}
+            </AvatarFallback>
+          </Avatar>
           <div>
-            <p className="text-[14px] font-bold text-zinc-100">
+            <p className="text-[14px] font-bold text-foreground">
               {argument.author}
             </p>
-            <p className="text-[11px] text-zinc-600">{argument.postedAt}</p>
+            <p className="text-[11px] text-muted-foreground">{argument.postedAt}</p>
           </div>
         </div>
 
         {isAuthor ? (
-          <span className="inline-flex items-center gap-1 rounded-md border border-teal-500/25 bg-teal-500/10 px-2.5 py-1 text-[11px] font-medium text-teal-400">
+          <span className="inline-flex items-center gap-1 rounded-md border border-primary/25 bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">
             <ShieldCheck className="h-3 w-3" strokeWidth={2} />
             {formatByline(argument)}
           </span>
         ) : (
-          <span className="inline-flex items-center gap-1 rounded-md border border-teal-500/25 bg-teal-500/10 px-2.5 py-1 text-[11px] font-medium text-teal-400">
+          <span className="inline-flex items-center gap-1 rounded-md border border-primary/25 bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">
             <ShieldCheck className="h-3 w-3" strokeWidth={2} />
             Vetted
           </span>
@@ -253,7 +318,7 @@ export function PublishedArgumentView({
               <ContestedChip key={fallacy} fallacyName={fallacy} />
             ))}
           </div>
-          <p className="text-[11px] leading-relaxed text-zinc-600">
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
             The judge flagged a possible fallacy. The author reviewed it,
             disagreed, and chose to post anyway. Hover the chip for details.
           </p>
@@ -261,48 +326,59 @@ export function PublishedArgumentView({
       )}
 
       {argument.caveats?.map((caveat) => (
-        <p key={caveat} className="mb-4 text-[12px] italic text-zinc-600">
+        <p key={caveat} className="mb-4 text-[12px] italic text-muted-foreground">
           {caveat}
         </p>
       ))}
 
-      <article className="mb-8 rounded-xl border border-zinc-800 bg-zinc-900/40 px-5 py-7 sm:px-8 sm:py-9">
-        <p className="whitespace-pre-wrap text-[18px] leading-[1.85] tracking-[-0.01em] text-zinc-100 sm:text-[19px]">
-          <CitationText segments={segments} sources={argument.sources} />
+      <article className="mb-8 rounded-2xl border border-border/80 bg-[#1a1714] px-6 py-8 sm:px-10 sm:py-10">
+        <p className="whitespace-pre-wrap font-serif text-[1.35rem] font-normal leading-[1.8] tracking-[0.01em] text-stone-100 antialiased md:text-[1.5rem]">
+          <CitationText
+            segments={segments}
+            sources={argument.sources}
+            hoveredSourceIndex={hoveredSourceIndex}
+            onSourceHover={setHoveredSourceIndex}
+          />
         </p>
       </article>
 
-      {argument.sources.length > 0 && (
-        <section className="mb-10">
-          <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-zinc-600">
-            Sources
-          </p>
-          <div className="flex flex-col gap-2">
-            {argument.sources.map((source, index) => (
-              <SourceListItem key={source.id} source={source} index={index} />
-            ))}
-          </div>
-        </section>
-      )}
-
       {!isAuthor && directReplies.length > 0 && (
-        <section className="border-t border-zinc-800 pt-8">
-          <p className="mb-5 text-[10px] font-bold uppercase tracking-widest text-zinc-600">
+        <section className="border-t border-border pt-8">
+          <p className="mb-5 text-xs font-bold uppercase tracking-widest text-muted-foreground">
             Replies · {totalReplyCount}
           </p>
-          <div className="space-y-6 rounded-xl border border-zinc-800/80 bg-zinc-900/30 p-4">
-            {directReplies.map((child) => (
-              <ThreadBranch
-                key={child.id}
-                node={buildPostTree(posts, child.id)}
-                onOpenPost={(id) => onThreadOpen?.(id)}
-                onReply={(id) => onThreadReply?.(id)}
-                onDeskBang={(id) => onThreadDeskBang?.(id)}
-              />
-            ))}
-          </div>
+          <ParliaventDebateThread
+            comments={replyComments}
+            getMeta={getReplyMeta}
+            onOpenPost={(id) => onThreadOpen?.(id)}
+            onReply={(id) => onThreadReply?.(id)}
+            onDeskBang={(id) => onThreadDeskBang?.(id)}
+          />
         </section>
       )}
+        </>
+      )}
+        </div>
+
+        {!isLoading && argument.sources.length > 0 && (
+          <aside className="xl:sticky xl:top-24 xl:self-start">
+            <p className="mb-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              Sources
+            </p>
+            <div className="flex flex-col gap-3">
+              {argument.sources.map((source, index) => (
+                <SourceListItem
+                  key={source.id}
+                  source={source}
+                  index={index}
+                  isHighlighted={hoveredSourceIndex === index}
+                  onSourceHover={setHoveredSourceIndex}
+                />
+              ))}
+            </div>
+          </aside>
+        )}
+      </div>
     </motion.div>
   );
 }

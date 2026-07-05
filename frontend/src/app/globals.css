@@ -1,19 +1,74 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
+/*
+  Parliavent — warm dark + vermillion accent (#EC4E02).
+  Built around hero-dithering-card, header-2, reddit-nested-thread-reply.
+*/
 :root {
-  --background: #09090b;
-  --foreground: #fafafa;
-  --muted: #71717a;
-  --border: #27272a;
-  --surface: #18181b;
-  --accent: #2dd4bf;
+  --radius: 0.75rem;
+
+  --background: #0c0a09;
+  --foreground: #fafaf9;
+
+  --card: #171412;
+  --card-foreground: #fafaf9;
+
+  --popover: #171412;
+  --popover-foreground: #fafaf9;
+
+  --primary: #ec4e02;
+  --primary-foreground: #ffffff;
+
+  --secondary: #292524;
+  --secondary-foreground: #e7e5e4;
+
+  --muted: #1f1c1a;
+  --muted-foreground: #a8a29e;
+
+  --accent: #2a1f18;
+  --accent-foreground: #fb923c;
+
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+
+  --border: #2e2a27;
+  --input: #2e2a27;
+  --ring: #ec4e02;
+
+  --brand: #ec4e02;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-brand: var(--brand);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-serif: var(--font-instrument-serif);
 }
 
 body {
@@ -24,12 +79,59 @@ body {
 
 mark {
   background: transparent;
+  color: inherit;
+}
+
+.citation-passage mark {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+  text-decoration-color: transparent;
+  padding: 0 2px;
+  margin: 0 -2px;
+  border-radius: 0.2rem;
+  transition:
+    background-color 0.2s ease,
+    text-decoration-color 0.2s ease;
+}
+
+.citation-passage:hover mark,
+.citation-passage:focus-within mark,
+.citation-passage--active mark {
+  background-color: var(--cite-bg);
+  text-decoration-color: var(--cite-underline);
+}
+
+.citation-passage .cite-marker {
+  opacity: 0.4;
+  transition:
+    opacity 0.2s ease,
+    color 0.2s ease;
+}
+
+.citation-passage:hover .cite-marker,
+.citation-passage:focus-within .cite-marker,
+.citation-passage--active .cite-marker {
+  opacity: 1;
 }
 
 textarea::placeholder {
-  color: #52525b;
+  color: #57534e;
 }
 
 ::selection {
-  background: rgba(45, 212, 191, 0.25);
+  background: rgba(236, 78, 2, 0.35);
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s ease-in-out infinite;
 }

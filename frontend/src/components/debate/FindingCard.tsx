@@ -11,6 +11,9 @@ import { classifyClaimKind } from "@/lib/evidence/classifyClaimKind";
 import { buildOpinionFallbackRewrite } from "@/lib/evidence/opinionFallbackRewrite";
 import type { EvidenceSearchResponse, EvidenceSource, Finding, FindingType } from "@/lib/types";
 import { AlertTriangle, BookOpen, Check, Loader2, MessageCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import { EvidenceCandidatesList } from "./EvidenceCandidatesList";
 
 interface FindingCardProps {
@@ -33,23 +36,23 @@ const typeConfig: Record<
   clarity: {
     label: "Clarity",
     icon: MessageCircle,
-    accent: "text-[#9a7b3c]",
-    border: "border-[#ebe3d4]",
-    dot: "bg-[#c9a96e]",
+    accent: "text-amber-400",
+    border: "border-amber-500/20",
+    dot: "bg-amber-400",
   },
   claim: {
     label: "Claim",
     icon: BookOpen,
-    accent: "text-[#5a7a9e]",
-    border: "border-[#dce4ef]",
-    dot: "bg-[#7a9cc4]",
+    accent: "text-sky-400",
+    border: "border-sky-500/20",
+    dot: "bg-sky-400",
   },
   fallacy: {
     label: "Fallacy",
     icon: AlertTriangle,
-    accent: "text-[#9e5a5a]",
-    border: "border-[#ebdede]",
-    dot: "bg-[#c47a7a]",
+    accent: "text-red-400",
+    border: "border-red-500/25",
+    dot: "bg-red-400",
   },
 };
 
@@ -92,24 +95,25 @@ function ActionButton({
   disabled?: boolean;
   variant?: "default" | "primary" | "muted";
 }) {
-  const styles = {
-    default:
-      "border-[#e4e4e0] bg-white text-[#4a4a48] hover:border-[#d0d0cc] hover:bg-[#fafaf8]",
-    primary:
-      "border-[#1a1a18] bg-[#1a1a18] text-white hover:bg-[#2a2a28]",
-    muted:
-      "border-transparent bg-transparent text-[#8a8a86] hover:text-[#4a4a48]",
-  };
+  const variantMap = {
+    default: "outline",
+    primary: "default",
+    muted: "ghost",
+  } as const;
 
   return (
-    <button
-      type="button"
+    <Button
+      variant={variantMap[variant]}
+      size="sm"
       onClick={onClick}
       disabled={disabled}
-      className={`rounded-md border px-2.5 py-1.5 text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${styles[variant]}`}
+      className={cn(
+        "h-7 rounded-md px-2.5 text-[11px] font-medium",
+        variant === "muted" && "text-muted-foreground",
+      )}
     >
       {children}
-    </button>
+    </Button>
   );
 }
 
@@ -187,7 +191,11 @@ export function FindingCard({
 
   return (
     <article
-      className={`rounded-lg border bg-[#fafaf8] p-4 ${config.border} ${!isOpen ? "opacity-80" : ""}`}
+      className={cn(
+        "rounded-lg border bg-card p-4",
+        config.border,
+        !isOpen && "opacity-70",
+      )}
     >
       <div className="mb-2.5 flex items-center gap-2">
         <span className={`h-1.5 w-1.5 rounded-full ${config.dot}`} />
@@ -195,17 +203,17 @@ export function FindingCard({
           {config.label}
         </span>
         {isRelevanceClarityFinding(finding) && isOpen && (
-          <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-[#a8a8a4]">
+          <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
             · Relevance
           </span>
         )}
         {finding.confidence && isOpen && (
-          <span className="ml-auto text-[10px] text-[#a8a8a4]">
+          <span className="ml-auto text-[10px] text-muted-foreground/70">
             {finding.confidence} confidence
           </span>
         )}
         {statusLabel && (
-          <span className="ml-auto flex items-center gap-1 text-[10px] text-[#8ab89a]">
+          <span className="ml-auto flex items-center gap-1 text-[10px] text-emerald-400">
             <Check className="h-3 w-3" strokeWidth={2} />
             {statusLabel}
           </span>
@@ -215,29 +223,29 @@ export function FindingCard({
       <div className="mb-2 flex items-start gap-2">
         <Icon className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${config.accent}`} strokeWidth={1.75} />
         <div>
-          <h3 className="text-[13px] font-medium leading-snug text-[#3a3a38]">
+          <h3 className="text-[13px] font-medium leading-snug text-foreground">
             {finding.title}
           </h3>
           {finding.subtitle && (
-            <p className="mt-0.5 text-[11px] text-[#8a8a86]">{finding.subtitle}</p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">{finding.subtitle}</p>
           )}
         </div>
       </div>
 
-      <p className="mb-3 text-[12px] leading-relaxed text-[#6a6a66]">
+      <p className="mb-3 text-[12px] leading-relaxed text-muted-foreground">
         {finding.reason}
       </p>
 
-      <blockquote className="mb-3 rounded border-l-2 border-[#e4e4e0] bg-white/60 py-1 pl-2.5 pr-1 text-[11px] italic leading-relaxed text-[#7a7a76]">
+      <blockquote className="mb-3 rounded border-l-2 border-border bg-muted/40 py-1 pl-2.5 pr-1 text-[11px] italic leading-relaxed text-foreground/70">
         &ldquo;{finding.spanText}&rdquo;
       </blockquote>
 
       {finding.type === "clarity" && hasSuggestedRewrite(finding) && isOpen && (
-        <div className="mb-3 rounded-md border border-[#ececea] bg-white px-2.5 py-2">
-          <p className="mb-1 text-[10px] font-medium uppercase tracking-[0.1em] text-[#a8a8a4]">
+        <div className="mb-3 rounded-md border border-border bg-muted/40 px-2.5 py-2">
+          <p className="mb-1 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
             Suggested wording
           </p>
-          <p className="text-[12px] leading-relaxed text-[#4a4a48]">
+          <p className="text-[12px] leading-relaxed text-foreground/90">
             {finding.suggestedRewrite}
           </p>
         </div>
@@ -246,29 +254,29 @@ export function FindingCard({
       {finding.type === "fallacy" && fallacyExpanded && (
         <>
           {finding.subtitle && (
-            <p className="mb-2 text-[11px] text-[#8a8a86]">
-              <span className="font-medium text-[#6a6a66]">Fallacy: </span>
+            <p className="mb-2 text-[11px] text-muted-foreground">
+              <span className="font-medium text-foreground/70">Fallacy: </span>
               {finding.subtitle}
             </p>
           )}
           {finding.confidence && (
-            <p className="mb-2 text-[11px] text-[#8a8a86]">
-              <span className="font-medium text-[#6a6a66]">Confidence: </span>
+            <p className="mb-2 text-[11px] text-muted-foreground">
+              <span className="font-medium text-foreground/70">Confidence: </span>
               {finding.confidence}
             </p>
           )}
           {finding.example && (
-            <p className="mb-3 text-[11px] leading-relaxed text-[#8a8a86]">
-              <span className="font-medium text-[#6a6a66]">Example: </span>
+            <p className="mb-3 text-[11px] leading-relaxed text-muted-foreground">
+              <span className="font-medium text-foreground/70">Example: </span>
               {finding.example}
             </p>
           )}
           {finding.suggestedRewrite && (
-            <div className="mb-3 rounded-md border border-[#ececea] bg-white px-2.5 py-2">
-              <p className="mb-1 text-[10px] font-medium uppercase tracking-[0.1em] text-[#a8a8a4]">
+            <div className="mb-3 rounded-md border border-border bg-muted/40 px-2.5 py-2">
+              <p className="mb-1 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
                 Suggested wording
               </p>
-              <p className="text-[12px] leading-relaxed text-[#4a4a48]">
+              <p className="text-[12px] leading-relaxed text-foreground/90">
                 {finding.suggestedRewrite}
               </p>
             </div>
@@ -277,8 +285,8 @@ export function FindingCard({
       )}
 
       {finding.status === "disputed" && finding.disputeReason && (
-        <p className="mb-3 rounded-md border border-[#ebdede] bg-white/60 px-2.5 py-2 text-[11px] leading-relaxed text-[#7a7a76]">
-          <span className="font-medium text-[#6a6a66]">Your dispute: </span>
+        <p className="mb-3 rounded-md border border-red-500/20 bg-red-500/5 px-2.5 py-2 text-[11px] leading-relaxed text-foreground/70">
+          <span className="font-medium text-foreground/80">Your dispute: </span>
           {finding.disputeReason}
         </p>
       )}
@@ -329,7 +337,7 @@ export function FindingCard({
                 {hasNegativeEvidence ? "Keep as-is anyway" : "Keep as-is"}
               </ActionButton>
               {hasNegativeEvidence && (
-                <p className="text-[10px] leading-relaxed text-[#9a7a6a]">
+                <p className="text-[10px] leading-relaxed text-amber-400/80">
                   {KEEP_AS_IS_CAVEAT_HINT}
                 </p>
               )}
@@ -337,22 +345,22 @@ export function FindingCard({
           </div>
 
           {revisePanelOpen && !allowOneClickOpinion && (
-            <div className="mt-3 rounded-md border border-[#ececea] bg-white px-2.5 py-2.5">
-              <p className="mb-2 text-[11px] leading-relaxed text-[#6a6a66]">
+            <div className="mt-3 rounded-md border border-border bg-muted/40 px-2.5 py-2.5">
+              <p className="mb-2 text-[11px] leading-relaxed text-muted-foreground">
                 This is written as a factual claim. To treat it as opinion,
                 rewrite it as a personal view.
               </p>
 
-              <p className="mb-1 text-[10px] font-medium uppercase tracking-[0.1em] text-[#a8a8a4]">
+              <p className="mb-1 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
                 Suggested personal wording
               </p>
-              <div className="mb-2 rounded border-l-2 border-[#dce4ef] bg-[#fafaf8] py-1 pl-2.5 pr-1">
-                <p className="text-[11px] leading-relaxed text-[#4a4a48]">
+              <div className="mb-2 rounded border-l-2 border-sky-500/40 bg-background/60 py-1 pl-2.5 pr-1">
+                <p className="text-[11px] leading-relaxed text-foreground/90">
                   {opinionRewrite}
                 </p>
               </div>
               {!finding.suggestedRewrite && (
-                <p className="mb-2 text-[10px] leading-relaxed text-[#9a9a96]">
+                <p className="mb-2 text-[10px] leading-relaxed text-muted-foreground/80">
                   You can edit this wording before using it, or keep your
                   original claim as-is.
                 </p>
@@ -378,13 +386,13 @@ export function FindingCard({
           )}
 
           {sourceSearchError && (
-            <p className="mt-2 text-[11px] text-[#9a7a6a]" role="status">
+            <p className="mt-2 text-[11px] text-red-300/90" role="status">
               {sourceSearchError}
             </p>
           )}
 
           {sourceSearchEmpty && (
-            <p className="mt-2 text-[11px] text-[#8a8a86]" role="status">
+            <p className="mt-2 text-[11px] text-muted-foreground" role="status">
               {EVIDENCE_EMPTY_MESSAGE}
             </p>
           )}
@@ -430,12 +438,12 @@ export function FindingCard({
 
           {disputeOpen && (
             <div className="mt-3 space-y-2">
-              <textarea
+              <Textarea
                 value={disputeReason}
                 onChange={(e) => setDisputeReason(e.target.value)}
                 placeholder="Why do you disagree with this finding?"
                 rows={2}
-                className="w-full resize-none rounded-md border border-[#e4e4e0] bg-white px-2.5 py-2 text-[12px] leading-relaxed text-[#4a4a48] outline-none focus:border-[#c47a7a]/50"
+                className="min-h-0 resize-none bg-background/60 text-[12px] leading-relaxed"
               />
               <div className="flex gap-2">
                 <ActionButton variant="primary" onClick={handleDisputeSubmit}>

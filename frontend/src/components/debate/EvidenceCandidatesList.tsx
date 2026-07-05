@@ -12,6 +12,7 @@ import type {
   SourceCredibility,
   SupportLevel,
 } from "@/lib/types";
+import { Button } from "@/components/ui/button";
 
 interface EvidenceCandidatesListProps {
   claimVerdict: ClaimVerdict;
@@ -22,6 +23,12 @@ interface EvidenceCandidatesListProps {
 
 const VISIBLE_SOURCE_COUNT = 2;
 
+const POSITIVE_BADGE = "border-emerald-500/25 bg-emerald-500/10 text-emerald-400";
+const CAVEAT_BADGE = "border-amber-500/25 bg-amber-500/10 text-amber-400";
+const NEGATIVE_BADGE = "border-red-500/25 bg-red-500/10 text-red-400";
+const NEUTRAL_BADGE = "border-border bg-muted text-muted-foreground";
+const RELATED_BADGE = "border-sky-500/25 bg-sky-500/10 text-sky-400";
+
 const credibilityLabels: Record<SourceCredibility, string> = {
   high: "Reliable source",
   medium: "General source",
@@ -29,9 +36,9 @@ const credibilityLabels: Record<SourceCredibility, string> = {
 };
 
 const credibilityStyles: Record<SourceCredibility, string> = {
-  high: "border-[#c8e6d4] bg-[#f0faf4] text-[#4a8a6a]",
-  medium: "border-[#ebe3d4] bg-[#faf8f3] text-[#9a7b3c]",
-  low: "border-[#e4e4e0] bg-[#f5f5f3] text-[#8a8a86]",
+  high: POSITIVE_BADGE,
+  medium: CAVEAT_BADGE,
+  low: NEUTRAL_BADGE,
 };
 
 const verdictLabels: Record<ClaimVerdict, string> = {
@@ -44,12 +51,12 @@ const verdictLabels: Record<ClaimVerdict, string> = {
 };
 
 const verdictStyles: Record<ClaimVerdict, string> = {
-  supported: "border-[#c8e6d4] bg-[#f0faf4] text-[#4a8a6a]",
-  partially_supported: "border-[#ebe3d4] bg-[#faf8f3] text-[#9a7b3c]",
-  contradicted: "border-[#ebdede] bg-[#fdf6f6] text-[#9e5a5a]",
-  unsupported: "border-[#ebdede] bg-[#fdf6f6] text-[#9e5a5a]",
-  too_broad: "border-[#ebe3d4] bg-[#faf8f3] text-[#9a7b3c]",
-  unclear: "border-[#e4e4e0] bg-[#f5f5f3] text-[#8a8a86]",
+  supported: POSITIVE_BADGE,
+  partially_supported: CAVEAT_BADGE,
+  contradicted: NEGATIVE_BADGE,
+  unsupported: NEGATIVE_BADGE,
+  too_broad: CAVEAT_BADGE,
+  unclear: NEUTRAL_BADGE,
 };
 
 const supportLevelLabels: Record<SupportLevel, string> = {
@@ -61,14 +68,14 @@ const supportLevelLabels: Record<SupportLevel, string> = {
 };
 
 const supportLevelBadgeStyles: Record<SupportLevel, string> = {
-  supports: "border-[#c8e6d4] bg-[#f0faf4] text-[#4a8a6a]",
-  partially_supports: "border-[#ebe3d4] bg-[#faf8f3] text-[#9a7b3c]",
-  contradicts: "border-[#ebdede] bg-[#fdf6f6] text-[#9e5a5a]",
-  related_only: "border-[#dce4ef] bg-[#f4f7fb] text-[#5a7a9e]",
-  unclear: "border-[#e4e4e0] bg-[#f5f5f3] text-[#8a8a86]",
+  supports: POSITIVE_BADGE,
+  partially_supports: CAVEAT_BADGE,
+  contradicts: NEGATIVE_BADGE,
+  related_only: RELATED_BADGE,
+  unclear: NEUTRAL_BADGE,
 };
 
-function Badge({
+function MiniBadge({
   children,
   className,
 }: {
@@ -94,20 +101,21 @@ function SourceActionButton({
   if (source.canAttachAsSupport) {
     const isFullSupport = source.supportLevel === "supports";
     return (
-      <button
-        type="button"
+      <Button
+        variant={isFullSupport ? "default" : "outline"}
+        size="sm"
         onClick={(event) => {
           event.stopPropagation();
           onUseSource(source);
         }}
-        className={`rounded-md border px-2.5 py-1 text-[10px] font-medium transition-colors ${
+        className={
           isFullSupport
-            ? "border-[#1a1a18] bg-[#1a1a18] text-white hover:bg-[#2a2a28]"
-            : "border-[#9a7b3c] bg-white text-[#6a5a30] hover:bg-[#faf8f3]"
-        }`}
+            ? "h-6 rounded-md px-2.5 text-[10px] font-medium"
+            : "h-6 rounded-md border-amber-500/40 px-2.5 text-[10px] font-medium text-amber-300 hover:bg-amber-500/10 hover:text-amber-200"
+        }
       >
         {isFullSupport ? "Use as source" : "Use with caveat"}
-      </button>
+      </Button>
     );
   }
 
@@ -117,7 +125,7 @@ function SourceActionButton({
       target="_blank"
       rel="noopener noreferrer"
       onClick={(event) => event.stopPropagation()}
-      className="inline-flex items-center gap-1 rounded-md border border-[#d0d0cc] bg-white px-2.5 py-1 text-[10px] font-medium text-[#6a6a66] transition-colors hover:bg-[#fafaf8]"
+      className="inline-flex items-center gap-1 rounded-md border border-input bg-background px-2.5 py-1 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
     >
       Open source
       <ExternalLink className="h-2.5 w-2.5" strokeWidth={2} />
@@ -135,7 +143,7 @@ function SourceRow({
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <li className="rounded-md border border-[#ececea] bg-[#fafaf8]">
+    <li className="rounded-md border border-border/70 bg-muted/30">
       <button
         type="button"
         onClick={() => setExpanded((open) => !open)}
@@ -143,11 +151,11 @@ function SourceRow({
         className="w-full px-2.5 pt-2 text-left"
       >
         <div className="flex items-start gap-1.5">
-          <p className="min-w-0 flex-1 text-[11px] font-medium leading-snug text-[#4a4a48]">
+          <p className="min-w-0 flex-1 text-[11px] font-medium leading-snug text-foreground/90">
             {source.title}
           </p>
           <ChevronDown
-            className={`mt-0.5 h-3 w-3 shrink-0 text-[#a8a8a4] transition-transform ${
+            className={`mt-0.5 h-3 w-3 shrink-0 text-muted-foreground transition-transform ${
               expanded ? "rotate-180" : ""
             }`}
             strokeWidth={2}
@@ -155,17 +163,17 @@ function SourceRow({
         </div>
 
         <div className="mt-1 flex flex-wrap items-center gap-1">
-          <Badge className={credibilityStyles[source.credibility]}>
+          <MiniBadge className={credibilityStyles[source.credibility]}>
             {credibilityLabels[source.credibility]}
-          </Badge>
-          <Badge className={supportLevelBadgeStyles[source.supportLevel]}>
+          </MiniBadge>
+          <MiniBadge className={supportLevelBadgeStyles[source.supportLevel]}>
             {supportLevelLabels[source.supportLevel]}
-          </Badge>
-          <span className="text-[10px] text-[#9a9a96]">{source.publisher}</span>
+          </MiniBadge>
+          <span className="text-[10px] text-muted-foreground">{source.publisher}</span>
         </div>
 
         {!expanded && source.snippet && (
-          <p className="mt-1 line-clamp-1 text-[10px] leading-relaxed text-[#7a7a76]">
+          <p className="mt-1 line-clamp-1 text-[10px] leading-relaxed text-muted-foreground">
             {source.snippet}
           </p>
         )}
@@ -174,12 +182,12 @@ function SourceRow({
       {expanded && (
         <div className="px-2.5 pt-1.5">
           {source.snippet && (
-            <p className="mb-1.5 text-[10px] leading-relaxed text-[#7a7a76]">
+            <p className="mb-1.5 text-[10px] leading-relaxed text-muted-foreground">
               {source.snippet}
             </p>
           )}
           {source.rationale && (
-            <p className="mb-1.5 text-[10px] italic leading-relaxed text-[#8a8a86]">
+            <p className="mb-1.5 text-[10px] italic leading-relaxed text-muted-foreground/80">
               {source.rationale}
             </p>
           )}
@@ -187,7 +195,7 @@ function SourceRow({
             href={source.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-[10px] font-medium text-[#5a7a9e] underline decoration-[#dce4ef] underline-offset-2 hover:text-[#3a5a7e]"
+            className="inline-flex items-center gap-1 text-[10px] font-medium text-sky-400 underline decoration-sky-400/30 underline-offset-2 hover:text-sky-300"
           >
             {source.url.replace(/^https?:\/\/(www\.)?/, "").slice(0, 50)}
             <ExternalLink className="h-2.5 w-2.5" strokeWidth={2} />
@@ -230,19 +238,19 @@ export function EvidenceCandidatesList({
   const hasWhyDetail = Boolean(summary) || rationales.length > 0;
 
   return (
-    <div className="mt-3 rounded-lg border border-[#dce4ef] bg-white p-2 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+    <div className="mt-3 rounded-lg border border-border bg-card/80 p-2">
       <div className="mb-1.5 flex flex-wrap items-center gap-1.5 px-1">
-        <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-[#a8a8a4]">
+        <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
           Evidence review
         </p>
-        <Badge className={verdictStyles[claimVerdict]}>
+        <MiniBadge className={verdictStyles[claimVerdict]}>
           {verdictLabels[claimVerdict]}
-        </Badge>
+        </MiniBadge>
         {hasWhyDetail && (
           <button
             type="button"
             onClick={() => setWhyOpen((open) => !open)}
-            className="ml-auto text-[10px] font-medium text-[#7a7a76] underline decoration-[#d0d0cc] underline-offset-2 hover:text-[#4a4a48]"
+            className="ml-auto text-[10px] font-medium text-muted-foreground underline decoration-border underline-offset-2 hover:text-foreground"
           >
             {whyOpen ? "Hide why" : "Why this verdict?"}
           </button>
@@ -250,9 +258,9 @@ export function EvidenceCandidatesList({
       </div>
 
       {whyOpen && hasWhyDetail && (
-        <div className="mb-2 rounded-md border border-[#ececea] bg-[#fafaf8] px-2 py-1.5">
+        <div className="mb-2 rounded-md border border-border/70 bg-muted/30 px-2 py-1.5">
           {summary && (
-            <p className="text-[10px] leading-relaxed text-[#6a6a66]">
+            <p className="text-[10px] leading-relaxed text-foreground/80">
               {summary}
             </p>
           )}
@@ -261,7 +269,7 @@ export function EvidenceCandidatesList({
               {rationales.slice(0, 3).map((text, index) => (
                 <li
                   key={index}
-                  className="text-[10px] leading-relaxed text-[#8a8a86] before:mr-1 before:text-[#c0c0bc] before:content-['·']"
+                  className="text-[10px] leading-relaxed text-muted-foreground before:mr-1 before:text-muted-foreground/60 before:content-['·']"
                 >
                   {text}
                 </li>
@@ -272,7 +280,7 @@ export function EvidenceCandidatesList({
       )}
 
       {showUnsupportedWarning && (
-        <p className="mb-2 rounded-md border border-[#ebdede] bg-[#fdf6f6] px-2 py-1.5 text-[10px] leading-relaxed text-[#8a5050]">
+        <p className="mb-2 rounded-md border border-red-500/20 bg-red-500/5 px-2 py-1.5 text-[10px] leading-relaxed text-red-300/90">
           {EVIDENCE_UNSUPPORTED_WARNING}
         </p>
       )}
@@ -291,7 +299,7 @@ export function EvidenceCandidatesList({
         <button
           type="button"
           onClick={() => setShowAll((open) => !open)}
-          className="mt-1.5 w-full rounded-md px-2 py-1.5 text-[10px] font-medium text-[#7a7a76] transition-colors hover:bg-[#fafaf8] hover:text-[#4a4a48]"
+          className="mt-1.5 w-full rounded-md px-2 py-1.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
         >
           {showAll
             ? "Show fewer sources"

@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { applyUserApprovedEdit } from "@/lib/applyUserEdit";
+import { persistPublishFlow } from "@/lib/api/persistence";
 import { buildPublishedArgument } from "@/lib/buildPublishedArgument";
 import { citationsFromFindings, sourcesFromFindings } from "@/lib/citationsFromFindings";
 import {
@@ -69,6 +70,10 @@ export function DebateApp({ context, onBack, onPosted, onFinished }: DebateAppPr
   const [pendingOverlapApply, setPendingOverlapApply] = useState<string | null>(
     null,
   );
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
+  const [publishedArgument, setPublishedArgument] =
+    useState<PublishedArgument | null>(null);
 
   const citations = useMemo(() => citationsFromFindings(findings), [findings]);
   const attachedSources = useMemo(() => sourcesFromFindings(findings), [findings]);
@@ -223,7 +228,7 @@ export function DebateApp({ context, onBack, onPosted, onFinished }: DebateAppPr
     [updateFinding],
   );
 
-  const publishedArgument = useMemo(
+  const draftPublishedArgument = useMemo(
     () =>
       buildPublishedArgument({
         text: argumentText,
@@ -231,16 +236,51 @@ export function DebateApp({ context, onBack, onPosted, onFinished }: DebateAppPr
         kind: context.mode,
         issueId: context.issueId,
         parentId: context.parentId,
+        id: context.dbPostId,
+        debateId: context.debateId,
+        dbPostId: context.dbPostId,
+        author: context.debateId ? "Guest" : undefined,
       }),
     [argumentText, findings, context],
   );
 
-  const handlePost = useCallback(() => {
-    onPosted(publishedArgument);
-    setCurrentView("published");
-  }, [onPosted, publishedArgument]);
+  const handlePost = useCallback(async () => {
+    setPublishError(null);
 
-  if (currentView === "published") {
+    if (context.dbPostId) {
+      setIsPublishing(true);
+      try {
+        const saved = await persistPublishFlow(
+          context.dbPostId,
+          argumentText,
+          findings,
+          "Guest",
+        );
+        setPublishedArgument(saved);
+        onPosted(saved);
+        setCurrentView("published");
+      } catch (err) {
+        setPublishError(
+          err instanceof Error ? err.message : "Failed to publish post",
+        );
+      } finally {
+        setIsPublishing(false);
+      }
+      return;
+    }
+
+    onPosted(draftPublishedArgument);
+    setPublishedArgument(draftPublishedArgument);
+    setCurrentView("published");
+  }, [
+    argumentText,
+    context.dbPostId,
+    draftPublishedArgument,
+    findings,
+    onPosted,
+  ]);
+
+  if (currentView === "published" && publishedArgument) {
     return (
       <PublishedArgumentView
         argument={publishedArgument}
@@ -253,8 +293,8 @@ export function DebateApp({ context, onBack, onPosted, onFinished }: DebateAppPr
 
   return (
     <ComposerShell context={context} onBack={onBack}>
-      <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-0 px-4 pb-28 pt-6 lg:flex-row lg:gap-8 lg:px-8 lg:pb-8">
-        <section className="min-h-[420px] flex-1 lg:min-h-0">
+      <div className="flex w-full flex-1 flex-col gap-8 px-4 pb-28 pt-8 md:px-8 lg:flex-row lg:px-12 xl:px-16 lg:pb-10">
+        <section className="min-h-[420px] min-w-0 flex-1 lg:min-h-0">
           <ArgumentEditor
             text={argumentText}
             findings={findings}
@@ -267,7 +307,7 @@ export function DebateApp({ context, onBack, onPosted, onFinished }: DebateAppPr
           />
         </section>
 
-        <aside className="w-full shrink-0 lg:w-[340px] xl:w-[380px]">
+        <aside className="w-full shrink-0 lg:w-[min(420px,38%)]">
           <FindingsPanel
             findings={findings}
             argumentText={argumentText}
@@ -298,8 +338,10 @@ export function DebateApp({ context, onBack, onPosted, onFinished }: DebateAppPr
         findings={findings}
         judgeError={judgeError}
         isTooShort={isTooShort}
-        onPost={handlePost}
+        onPost={() => void handlePost()}
         postLabel={context.mode === "response" ? "Post response" : "Post starter"}
+        isPosting={isPublishing}
+        postError={publishError}
       />
     </ComposerShell>
   );

@@ -23,13 +23,13 @@ export function ContestedChip({ fallacyName, compact = false }: ContestedChipPro
   return (
     <span
       title={hint}
-      className={`inline-flex cursor-help items-center gap-1.5 rounded-md border border-amber-500/25 bg-amber-500/10 ${
+      className={`inline-flex cursor-help items-center gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 ${
         compact ? "px-2 py-0.5 text-[10px]" : "px-2.5 py-1 text-[11px]"
       }`}
     >
-      <span className="font-medium text-amber-400/90">Disputed</span>
-      <span className="text-zinc-500">·</span>
-      <span className="text-amber-200/70">{fallacyName}</span>
+      <span className="font-medium text-amber-400">Disputed</span>
+      <span className="text-muted-foreground">·</span>
+      <span className="text-amber-300/80">{fallacyName}</span>
     </span>
   );
 }

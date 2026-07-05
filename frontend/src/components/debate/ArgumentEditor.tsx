@@ -12,10 +12,10 @@ interface ArgumentEditorProps {
 }
 
 const highlightStyles: Record<FindingType, string> = {
-  clarity: "bg-[#f5ead8] decoration-[#c9a96e]/40",
-  claim: "bg-[#e8eef8] underline decoration-[#7a9cc4]/50 decoration-2 underline-offset-[3px]",
+  clarity: "bg-amber-500/20 decoration-amber-400/50",
+  claim: "bg-sky-500/20 underline decoration-sky-400/50 decoration-2 underline-offset-[3px]",
   fallacy:
-    "bg-[#f8e8e8] underline decoration-[#c47a7a]/50 decoration-2 underline-offset-[3px]",
+    "bg-red-500/20 underline decoration-red-400/50 decoration-2 underline-offset-[3px]",
 };
 
 interface DisplaySegment {
@@ -135,7 +135,7 @@ function ArgumentDisplay({
             <span key={i}>
               {content}
               <sup
-                className="ml-0.5 text-[10px] font-medium text-[#5a7a9e]"
+                className="ml-0.5 text-[10px] font-medium text-primary"
                 title={
                   attachedSources[segment.citationIndex]?.title ?? "Source"
                 }
@@ -163,18 +163,18 @@ export function ArgumentEditor({
   return (
     <div className="flex h-full flex-col">
       <div className="mb-3 flex items-baseline justify-between">
-        <p className="text-[11px] font-bold uppercase tracking-widest text-zinc-600">
+        <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
           {label}
         </p>
-        <p className="text-[11px] text-zinc-700">
+        <p className="text-[11px] text-muted-foreground">
           {text.length} chars
         </p>
       </div>
 
-      <div className="relative flex-1 rounded-xl border border-zinc-800 bg-zinc-900/60 shadow-inner shadow-black/20">
+      <div className="relative flex-1 rounded-2xl border border-border bg-card shadow-sm">
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words rounded-xl px-6 py-7 text-[19px] leading-[1.75] tracking-[-0.01em] text-zinc-100 sm:px-8 sm:py-8 sm:text-[20px]"
+          className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words rounded-2xl px-6 py-7 text-[19px] leading-[1.75] tracking-[-0.01em] text-foreground sm:px-8 sm:py-8 sm:text-[20px]"
         >
           <ArgumentDisplay
             text={text}
@@ -188,7 +188,7 @@ export function ArgumentEditor({
           value={text}
           onChange={(e) => onChange(e.target.value)}
           spellCheck
-          className="relative min-h-[380px] w-full resize-none rounded-xl bg-transparent px-6 py-7 text-[19px] leading-[1.75] tracking-[-0.01em] text-transparent caret-teal-400 outline-none selection:bg-teal-500/20 sm:min-h-[440px] sm:px-8 sm:py-8 sm:text-[20px]"
+          className="relative min-h-[380px] w-full resize-none rounded-2xl bg-transparent px-6 py-7 text-[19px] leading-[1.75] tracking-[-0.01em] text-transparent caret-primary outline-none selection:bg-primary/15 sm:min-h-[440px] sm:px-8 sm:py-8 sm:text-[20px]"
         />
       </div>
     </div>

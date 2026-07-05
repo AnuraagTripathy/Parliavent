@@ -1,7 +1,11 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import type { CheckingState, EvidenceSearchResponse, EvidenceSource, Finding } from "@/lib/types";
+import { Button } from "@/components/ui/button";
+import { SkeletonCard } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
+import { transitionFast } from "@/lib/motion";
 import { FindingCard } from "./FindingCard";
 
 interface FindingsPanelProps {
@@ -61,16 +65,14 @@ export function FindingsPanel({
       className="flex flex-col"
     >
       <div className="mb-4 flex items-center justify-between">
-        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#9a9a96]">
+        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
           Judge review
         </p>
         <div className="flex items-center gap-2">
           {isChecking ? (
-            <span className="text-[11px] text-[#8a8a86] animate-pulse">
-              Checking argument...
-            </span>
+            <Spinner className="text-[11px]" label="Reviewing…" />
           ) : (
-            <span className="rounded-full border border-[#e8e8e4] bg-white px-2 py-0.5 text-[11px] text-[#8a8a86]">
+            <span className="rounded-full border border-border bg-card px-2 py-0.5 text-[11px] text-muted-foreground">
               {findings.length} findings
             </span>
           )}
@@ -78,7 +80,7 @@ export function FindingsPanel({
             <button
               type="button"
               onClick={onCheckNow}
-              className="text-[11px] font-medium text-[#7a7a76] underline decoration-[#d0d0cc] underline-offset-2 transition-colors hover:text-[#4a4a48]"
+              className="text-[11px] font-medium text-muted-foreground underline decoration-border underline-offset-2 transition-colors hover:text-foreground"
             >
               Check now
             </button>
@@ -87,74 +89,91 @@ export function FindingsPanel({
       </div>
 
       {judgeError && (
-        <p className="mb-3 text-[12px] text-[#9a7a6a]" role="status">
+        <p className="mb-3 text-[12px] text-amber-400/90" role="status">
           {judgeError}
         </p>
       )}
 
       {pendingOverlapApply && (
-        <div className="mb-3 rounded-lg border border-[#ebe3d4] bg-[#faf8f3] px-3.5 py-3">
-          <p className="mb-2.5 text-[12px] leading-relaxed text-[#6a6a66]">
+        <div className="mb-3 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3.5 py-3">
+          <p className="mb-2.5 text-[12px] leading-relaxed text-foreground/80">
             This edit may also resolve another review item because the
             highlighted text overlaps.
           </p>
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
+            <Button
+              size="sm"
               onClick={onConfirmOverlapApply}
-              className="rounded-md border border-[#1a1a18] bg-[#1a1a18] px-2.5 py-1.5 text-[11px] font-medium text-white transition-colors hover:bg-[#2a2a28]"
+              className="h-7 rounded-md px-2.5 text-[11px] font-medium"
             >
               Apply anyway
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={onCancelOverlapApply}
-              className="rounded-md border border-[#e4e4e0] bg-white px-2.5 py-1.5 text-[11px] font-medium text-[#6a6a66] transition-colors hover:border-[#d0d0cc]"
+              className="h-7 rounded-md px-2.5 text-[11px] font-medium"
             >
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       )}
 
+      {isChecking && findings.length === 0 && (
+        <div className="space-y-3">
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
+      )}
+
       {showShortTextState && (
-        <div className="rounded-xl border border-dashed border-[#e0e0dc] bg-[#fafaf8] px-4 py-6 text-center">
-          <p className="text-[13px] font-medium text-[#6a6a66]">
+        <div className="rounded-xl border border-dashed border-border bg-card/50 px-4 py-6 text-center">
+          <p className="text-[13px] font-medium text-muted-foreground">
             Write a little more for review.
           </p>
         </div>
       )}
 
       {showEmptyState && (
-        <div className="rounded-xl border border-dashed border-[#e0e0dc] bg-[#fafaf8] px-4 py-6 text-center">
-          <p className="text-[13px] font-medium text-[#6a6a66]">
+        <div className="rounded-xl border border-dashed border-border bg-card/50 px-4 py-6 text-center">
+          <p className="text-[13px] font-medium text-muted-foreground">
             Nothing to flag. Ready to post.
           </p>
         </div>
       )}
 
-      <div
-        className={`flex flex-col gap-3 transition-opacity duration-200 ${
-          isChecking && findings.length > 0 ? "opacity-80" : "opacity-100"
-        }`}
-      >
-        {findings.map((finding) => (
-          <div key={finding.id}>
-            <FindingCard
-              finding={finding}
-              argumentText={argumentText}
-              threadId={threadId}
-              onUseSuggestion={onUseSuggestion}
-              onKeepAsIs={onKeepAsIs}
-              onSourceSearchResult={onSourceSearchResult}
-              onAttachEvidenceSource={onAttachEvidenceSource}
-              onApplyRewrite={onApplyRewrite}
-              onMarkAsOpinion={onMarkAsOpinion}
-              onDispute={onDispute}
-            />
-          </div>
-        ))}
-      </div>
+      <AnimatePresence initial={false}>
+        <div
+          className={`flex flex-col gap-3 transition-opacity duration-200 ${
+            isChecking && findings.length > 0 ? "opacity-70" : "opacity-100"
+          }`}
+        >
+          {findings.map((finding) => (
+            <motion.div
+              key={finding.id}
+              layout
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={transitionFast}
+            >
+              <FindingCard
+                finding={finding}
+                argumentText={argumentText}
+                threadId={threadId}
+                onUseSuggestion={onUseSuggestion}
+                onKeepAsIs={onKeepAsIs}
+                onSourceSearchResult={onSourceSearchResult}
+                onAttachEvidenceSource={onAttachEvidenceSource}
+                onApplyRewrite={onApplyRewrite}
+                onMarkAsOpinion={onMarkAsOpinion}
+                onDispute={onDispute}
+              />
+            </motion.div>
+          ))}
+        </div>
+      </AnimatePresence>
     </motion.div>
   );
 }

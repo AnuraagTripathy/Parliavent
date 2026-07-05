@@ -1,4 +1,11 @@
-import { Plus } from "lucide-react";
+"use client";
+
+import React from "react";
+import { Landmark, Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { MenuToggleIcon } from "@/components/ui/menu-toggle-icon";
+import { useScroll } from "@/components/ui/use-scroll";
+import { cn } from "@/lib/utils";
 import type { AppScreen } from "@/lib/types";
 
 interface SiteHeaderProps {
@@ -14,65 +21,133 @@ export function SiteHeader({
   subtitle,
   onCreateStarter,
 }: SiteHeaderProps) {
+  const [open, setOpen] = React.useState(false);
+  const scrolled = useScroll(10);
+
   const isFeedActive =
     screen === "feed" || screen === "issue" || screen === "post";
 
+  React.useEffect(() => {
+    document.body.style.overflow = open ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [open]);
+
+  function goHome() {
+    setOpen(false);
+    onNavigate("feed");
+  }
+
+  function handleCreate() {
+    setOpen(false);
+    onCreateStarter?.();
+  }
+
   return (
-    <header className="sticky top-0 z-20 border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur-md">
-      <div className="mx-auto flex max-w-5xl items-center gap-4 px-4 py-3 lg:px-0">
+    <header
+      className={cn(
+        "sticky top-0 z-50 mx-auto w-full max-w-5xl border-b md:rounded-md md:border md:transition-all md:ease-out",
+        scrolled && !open
+          ? "border-border bg-background/95 shadow-lg shadow-black/20 backdrop-blur-lg supports-[backdrop-filter]:bg-background/60 md:top-4 md:max-w-4xl"
+          : "border-border/70 bg-background/85 backdrop-blur-md md:border-transparent md:bg-transparent md:backdrop-blur-none",
+        open && "border-border bg-background/95",
+      )}
+    >
+      <nav
+        className={cn(
+          "flex h-14 w-full items-center justify-between px-4 md:h-12 md:transition-all md:ease-out",
+          scrolled && "md:px-3",
+        )}
+      >
         <button
           type="button"
-          onClick={() => onNavigate("feed")}
+          onClick={goHome}
           className="flex shrink-0 items-center gap-2.5"
         >
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-100 text-sm">
-            🏛
+          <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
+            <Landmark className="h-4 w-4" strokeWidth={2.25} />
           </span>
-          <span className="hidden text-[15px] font-bold tracking-tight text-zinc-50 sm:inline">
+          <span className="text-[15px] font-bold tracking-tight text-foreground">
             parliavent
           </span>
         </button>
 
-        <div className="hidden min-w-0 flex-1 sm:block">
-          <div className="mx-auto max-w-sm rounded-lg border border-zinc-800 bg-zinc-900/60 px-3.5 py-2">
-            <input
-              type="search"
-              placeholder="Search issues..."
-              className="w-full bg-transparent text-[13px] text-zinc-200 outline-none placeholder:text-zinc-600"
-              readOnly
-            />
-          </div>
-        </div>
-
-        <nav className="ml-auto flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => onNavigate("feed")}
-            className={`rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-colors ${
+        <div className="hidden items-center gap-1.5 md:flex">
+          {subtitle && (
+            <span className="mr-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+              {subtitle}
+            </span>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={goHome}
+            className={cn(
+              "h-8 text-[13px]",
               isFeedActive
-                ? "bg-zinc-800 text-zinc-50"
-                : "text-zinc-500 hover:bg-zinc-900 hover:text-zinc-300"
-            }`}
+                ? "bg-accent text-accent-foreground"
+                : "text-muted-foreground",
+            )}
           >
             Home
-          </button>
+          </Button>
           {onCreateStarter && (
-            <button
-              type="button"
-              onClick={onCreateStarter}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-100 px-3 py-1.5 text-[12px] font-bold text-zinc-950 transition-colors hover:bg-white"
-            >
-              <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
-              <span className="hidden sm:inline">Create</span>
-            </button>
+            <Button size="sm" onClick={handleCreate} className="h-8 text-[13px]">
+              <Plus className="mr-1.5 h-3.5 w-3.5" strokeWidth={2.5} />
+              Create
+            </Button>
           )}
-        </nav>
+        </div>
 
-        {subtitle && (
-          <span className="hidden text-[10px] font-semibold uppercase tracking-widest text-zinc-600 lg:inline">
-            {subtitle}
-          </span>
+        <Button
+          size="icon"
+          variant="outline"
+          onClick={() => setOpen(!open)}
+          className="h-9 w-9 md:hidden"
+          aria-label={open ? "Close menu" : "Open menu"}
+        >
+          <MenuToggleIcon open={open} className="size-5" duration={300} />
+        </Button>
+      </nav>
+
+      <div
+        className={cn(
+          "fixed inset-x-0 bottom-0 top-14 z-50 flex flex-col overflow-hidden border-y border-border bg-background/95 backdrop-blur-lg md:hidden",
+          open ? "block" : "hidden",
         )}
+      >
+        <div
+          data-slot={open ? "open" : "closed"}
+          className={cn(
+            "data-[slot=open]:animate-in data-[slot=open]:zoom-in-95 data-[slot=closed]:animate-out data-[slot=closed]:zoom-out-95 ease-out",
+            "flex h-full w-full flex-col justify-between gap-y-2 p-4",
+          )}
+        >
+          <div className="grid gap-y-2">
+            {subtitle && (
+              <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                {subtitle}
+              </p>
+            )}
+            <Button
+              variant="ghost"
+              onClick={goHome}
+              className={cn(
+                "justify-start",
+                isFeedActive && "bg-accent text-accent-foreground",
+              )}
+            >
+              Home
+            </Button>
+          </div>
+          {onCreateStarter && (
+            <Button onClick={handleCreate} className="w-full">
+              <Plus className="mr-1.5 h-4 w-4" strokeWidth={2.5} />
+              Create debate
+            </Button>
+          )}
+        </div>
       </div>
     </header>
   );

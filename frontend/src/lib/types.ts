@@ -149,6 +149,10 @@ export interface PublishedArgument {
   parentId?: string;
   deskBangs?: number;
   userBanged?: boolean;
+  /** Postgres debate id when persisted */
+  debateId?: string;
+  /** Postgres post id when persisted */
+  dbPostId?: string;
 }
 
 export interface Issue {
@@ -173,9 +177,13 @@ export interface ComposerContext {
   parentId?: string;
   parentAuthor?: string;
   parentPreview?: string;
+  /** Postgres ids when debate was saved at creation */
+  debateId?: string;
+  dbPostId?: string;
 }
 
 export type AppScreen =
+  | "landing"
   | "feed"
   | "issue"
   | "post"
