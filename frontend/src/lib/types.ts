@@ -153,6 +153,32 @@ export interface PublishedArgument {
   debateId?: string;
   /** Postgres post id when persisted */
   dbPostId?: string;
+  /** ISO timestamp when post was published; null if draft */
+  publishedAt?: string | null;
+  /** Debate motion for saved posts */
+  debateMotion?: string;
+  /** Debate judge mode for saved posts */
+  debateMode?: JudgeMode;
+}
+
+export interface SavedDebateStarterPreview {
+  id: string;
+  preview: string;
+  authorName: string;
+  publishedAt: string | null;
+}
+
+export interface SavedDebateSummary {
+  id: string;
+  slug: string;
+  motion: string;
+  mode: JudgeMode;
+  createdAt: string;
+  updatedAt: string;
+  starterPost: SavedDebateStarterPreview | null;
+  postCount: number;
+  findingCount: number;
+  caveatCount: number;
 }
 
 export interface Issue {
@@ -177,6 +203,14 @@ export interface ComposerContext {
   parentId?: string;
   parentAuthor?: string;
   parentPreview?: string;
+  /** Full parent post text for judge context */
+  parentArgument?: string;
+  /** Saved debate in Postgres (starter or reply) */
+  isSavedDebate?: boolean;
+  /** Additional starter on an existing saved debate */
+  isAdditionalStarter?: boolean;
+  /** Parent post DB id for reply publish */
+  parentDbPostId?: string;
   /** Postgres ids when debate was saved at creation */
   debateId?: string;
   dbPostId?: string;

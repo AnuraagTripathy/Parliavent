@@ -16,7 +16,9 @@ export function postToComment(
   return {
     id: post.id,
     author: post.author,
-    content: fullText ? post.text : previewText(post.text),
+    content: fullText
+      ? post.text
+      : previewText(post.text.trim() || "(Empty draft)"),
     timestamp: post.postedAt,
     upvotes: post.deskBangs ?? 0,
     downvotes: 0,

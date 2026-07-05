@@ -148,4 +148,49 @@ export const JUDGE_EVAL_CASES: JudgeEvalCase[] = [
       ],
     },
   },
+  {
+    id: "eval-off-topic-reply",
+    label: "Off-topic reply (cookies tangent)",
+    text: "Cookies should be banned from this building.",
+    context: {
+      motion: "Should cities ban cars from downtown areas?",
+      postType: "reply",
+      parentArgument:
+        "European cities reduced car access and became more walkable.",
+      userStance: "unknown",
+    },
+    expected: {
+      minFindings: 1,
+      maxFindings: 2,
+      shouldIncludeTypes: ["clarity"],
+      shouldNotIncludeTypes: ["claim", "fallacy"],
+      notes: [
+        "Should return a clarity finding for unclear relevance to the parent argument.",
+        "Must NOT be flagged as claim or fallacy.",
+      ],
+    },
+  },
+  {
+    id: "eval-reply-factual-claim",
+    label: "Reply with factual claim (London congestion pricing)",
+    text: "London congestion pricing reduced traffic.",
+    context: {
+      motion: "Should cities ban cars from downtown areas?",
+      postType: "reply",
+      parentArgument:
+        "European cities reduced car access and became more walkable.",
+      userStance: "unknown",
+    },
+    expected: {
+      minFindings: 1,
+      maxFindings: 2,
+      shouldIncludeTypes: ["claim"],
+      shouldNotIncludeTypes: ["clarity"],
+      notes: [
+        "Should return a claim finding for the factual statement.",
+        "Must NOT flag unclear relevance — the reply engages with the parent topic.",
+        "Source search should work on the claim span after posting.",
+      ],
+    },
+  },
 ];

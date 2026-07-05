@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, ExternalLink, MessageSquare, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ExternalLink, MessageSquare, PenLine, ShieldCheck } from "lucide-react";
 import { motion } from "framer-motion";
 import { formatByline } from "@/lib/buildPublishedArgument";
 import {
@@ -14,7 +14,9 @@ import { getCitationColor } from "@/lib/mockPublishedArguments";
 import { buildSourceIndex, highlightCitations } from "@/lib/highlightCitations";
 import { startersToComments } from "@/lib/postsToCommentTree";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { SkeletonPost } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
@@ -35,6 +37,8 @@ interface PublishedArgumentViewProps {
   onDeskBang?: () => void;
   onDone?: () => void;
   onReply?: () => void;
+  onAnotherStarter?: () => void;
+  onOpenParent?: () => void;
   onThreadReply?: (postId: string) => void;
   onThreadOpen?: (postId: string) => void;
   onThreadDeskBang?: (postId: string) => void;
@@ -96,19 +100,17 @@ function CitationText({
 
         if (segment.caveatMessage) {
           return (
-            <span key={i}>
-              <span className="underline decoration-dotted decoration-muted-foreground/50 underline-offset-[3px]">
-                {segment.text}
-              </span>
-              <span className="ml-1.5 text-[11px] italic text-muted-foreground">
-                {segment.caveatMessage}
-              </span>
+            <span
+              key={i}
+              className="border-b border-dotted border-amber-500/50 text-foreground/90"
+            >
+              {segment.text}
             </span>
           );
         }
 
         return (
-          <span key={i} className="text-stone-100">
+          <span key={i} className="text-foreground/90">
             {segment.text}
           </span>
         );
@@ -180,6 +182,8 @@ export function PublishedArgumentView({
   onDeskBang,
   onDone,
   onReply,
+  onAnotherStarter,
+  onOpenParent,
   onThreadReply,
   onThreadOpen,
   onThreadDeskBang,
@@ -198,10 +202,26 @@ export function PublishedArgumentView({
   );
   const isAuthor = variant === "author";
   const issue = argument.issueId ? getIssue(argument.issueId) : undefined;
-  const contextLabel = issue?.title ?? "Argument";
+  const contextLabel =
+    issue?.title ?? argument.debateMotion ?? "Argument";
+  const isSavedDebate = Boolean(argument.debateId);
+  const parentPost = argument.parentId
+    ? posts.find((p) => p.id === argument.parentId)
+    : undefined;
 
   const directReplies =
     posts.length > 0 ? getChildren(posts, argument.id) : [];
+  const otherStarters =
+    isSavedDebate && argument.kind === "starter"
+      ? posts.filter(
+          (p) =>
+            p.debateId === argument.debateId &&
+            p.kind === "starter" &&
+            !p.parentId &&
+            p.id !== argument.id &&
+            p.publishedAt,
+        )
+      : [];
   const totalReplyCount = directReplies.reduce((sum, child) => {
     const node = buildPostTree(posts, child.id);
     return sum + 1 + countDescendants(node);
@@ -227,20 +247,18 @@ export function PublishedArgumentView({
       transition={{ duration: 0.25, ease: "easeOut" }}
       className="w-full px-4 py-8 md:px-8 lg:px-12 xl:px-16"
     >
-      <div className="grid w-full gap-10 xl:grid-cols-[1fr_minmax(280px,360px)]">
-        <div className="min-w-0">
       <div className="mb-6 flex flex-wrap items-center gap-2">
         <Button
           variant="ghost"
           size="sm"
           onClick={onBack}
-          className="h-8 px-2 text-[12px] font-semibold text-muted-foreground"
+          className="h-8 px-2 text-xs text-muted-foreground"
         >
           <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
           {isAuthor ? "Back to edit" : "Back to thread"}
         </Button>
         {isAuthor && onDone && (
-          <Button size="sm" onClick={onDone} className="h-8 text-[12px] font-bold">
+          <Button size="sm" onClick={onDone} className="h-8 text-xs font-semibold">
             View in debate
           </Button>
         )}
@@ -249,119 +267,241 @@ export function PublishedArgumentView({
             variant="outline"
             size="sm"
             onClick={onReply}
-            className="h-8 text-[12px] font-semibold"
+            className="h-8 text-xs font-semibold"
           >
             <MessageSquare className="mr-1.5 h-3.5 w-3.5" strokeWidth={2} />
             Reply
           </Button>
         )}
-      </div>
-
-      {isLoading ? (
-        <div className="space-y-4">
-          <Spinner label="Loading saved post…" />
-          <SkeletonPost />
-        </div>
-      ) : (
-        <>
-      <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-        {contextLabel}
-      </p>
-
-      <div className="mb-5 flex flex-wrap items-center gap-3">
-        {!isAuthor && onDeskBang && (
-          <DeskBangButton
-            count={argument.deskBangs ?? 0}
-            banged={argument.userBanged ?? false}
-            onToggle={onDeskBang}
-            layout="horizontal"
-          />
-        )}
-        <div className="flex items-center gap-2.5">
-          <Avatar className="h-9 w-9">
-            <AvatarImage
-              src={`https://api.dicebear.com/8.x/lorelei/svg?seed=${encodeURIComponent(argument.author)}`}
-              alt=""
-            />
-            <AvatarFallback className="bg-primary/10 text-[12px] font-bold">
-              {argument.author
-                .split(" ")
-                .map((n) => n[0])
-                .join("")}
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            <p className="text-[14px] font-bold text-foreground">
-              {argument.author}
-            </p>
-            <p className="text-[11px] text-muted-foreground">{argument.postedAt}</p>
-          </div>
-        </div>
-
-        {isAuthor ? (
-          <span className="inline-flex items-center gap-1 rounded-md border border-primary/25 bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">
-            <ShieldCheck className="h-3 w-3" strokeWidth={2} />
-            {formatByline(argument)}
-          </span>
-        ) : (
-          <span className="inline-flex items-center gap-1 rounded-md border border-primary/25 bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">
-            <ShieldCheck className="h-3 w-3" strokeWidth={2} />
-            Vetted
-          </span>
+        {!isAuthor && onAnotherStarter && isSavedDebate && argument.kind === "starter" && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onAnotherStarter}
+            className="h-8 text-xs font-semibold"
+          >
+            <PenLine className="mr-1.5 h-3.5 w-3.5" strokeWidth={2} />
+            Another argument
+          </Button>
         )}
       </div>
 
-      {(argument.contestedFallacies?.length ?? 0) > 0 && (
-        <div className="mb-4 space-y-2">
-          <div className="flex flex-wrap gap-2">
-            {argument.contestedFallacies!.map((fallacy) => (
-              <ContestedChip key={fallacy} fallacyName={fallacy} />
-            ))}
-          </div>
-          <p className="text-[11px] leading-relaxed text-muted-foreground">
-            The judge flagged a possible fallacy. The author reviewed it,
-            disagreed, and chose to post anyway. Hover the chip for details.
-          </p>
-        </div>
-      )}
+      <div
+        className={cn(
+          "grid w-full gap-8",
+          !isLoading &&
+            argument.sources.length > 0 &&
+            "xl:grid-cols-[1fr_minmax(280px,320px)]",
+        )}
+      >
+        <div className="min-w-0 space-y-6">
+          {isLoading ? (
+            <div className="space-y-4">
+              <Spinner label="Loading saved post…" />
+              <SkeletonPost />
+            </div>
+          ) : (
+            <>
+              {issue ? (
+                <div>
+                  <span className="mb-2 inline-block text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+                    {issue.category}
+                  </span>
+                  <h1 className="font-serif text-2xl font-medium leading-tight tracking-tight text-foreground md:text-3xl">
+                    {issue.title}
+                  </h1>
+                </div>
+              ) : argument.debateMotion ? (
+                <div>
+                  <h1 className="font-serif text-2xl font-medium leading-tight tracking-tight text-foreground md:text-3xl">
+                    {argument.debateMotion}
+                  </h1>
+                </div>
+              ) : (
+                <Badge
+                  variant="secondary"
+                  className="border-transparent bg-muted text-[10px] uppercase tracking-[0.16em] text-muted-foreground"
+                >
+                  {contextLabel}
+                </Badge>
+              )}
 
-      {argument.caveats?.map((caveat) => (
-        <p key={caveat} className="mb-4 text-[12px] italic text-muted-foreground">
-          {caveat}
-        </p>
-      ))}
+              {argument.kind === "response" && parentPost && (
+                <div className="rounded-lg border border-border bg-muted/20 px-4 py-3">
+                  <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    In reply to {parentPost.author}
+                  </p>
+                  <p className="line-clamp-2 text-sm text-foreground/75">
+                    &ldquo;{parentPost.text.slice(0, 160)}
+                    {parentPost.text.length > 160 ? "…" : ""}&rdquo;
+                  </p>
+                  {onOpenParent && (
+                    <button
+                      type="button"
+                      onClick={onOpenParent}
+                      className="mt-2 text-xs font-medium text-primary hover:underline"
+                    >
+                      View parent post
+                    </button>
+                  )}
+                </div>
+              )}
 
-      <article className="mb-8 rounded-2xl border border-border/80 bg-[#1a1714] px-6 py-8 sm:px-10 sm:py-10">
-        <p className="whitespace-pre-wrap font-serif text-[1.35rem] font-normal leading-[1.8] tracking-[0.01em] text-stone-100 antialiased md:text-[1.5rem]">
-          <CitationText
-            segments={segments}
-            sources={argument.sources}
-            hoveredSourceIndex={hoveredSourceIndex}
-            onSourceHover={setHoveredSourceIndex}
-          />
-        </p>
-      </article>
+              <Card className="border-border/80 bg-card">
+                <CardHeader className="space-y-0 p-5 md:p-6">
+                  <div className="flex flex-wrap items-center gap-3">
+                    {!isAuthor && onDeskBang && (
+                      <DeskBangButton
+                        count={argument.deskBangs ?? 0}
+                        banged={argument.userBanged ?? false}
+                        onToggle={onDeskBang}
+                        layout="horizontal"
+                      />
+                    )}
+                    <Avatar className="h-9 w-9">
+                      <AvatarImage
+                        src={`https://api.dicebear.com/8.x/lorelei/svg?seed=${encodeURIComponent(argument.author)}`}
+                        alt=""
+                      />
+                      <AvatarFallback className="bg-primary/10 text-xs font-bold">
+                        {argument.author
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-foreground">
+                        {argument.author}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {argument.postedAt}
+                      </p>
+                    </div>
+                    {isAuthor ? (
+                      <Badge
+                        variant="secondary"
+                        className="border-transparent bg-primary/10 text-[10px] text-primary"
+                      >
+                        <ShieldCheck className="mr-1 h-3 w-3" strokeWidth={2} />
+                        {formatByline(argument)}
+                      </Badge>
+                    ) : (
+                      <Badge
+                        variant="secondary"
+                        className="border-transparent bg-primary/10 text-[10px] text-primary"
+                      >
+                        <ShieldCheck className="mr-1 h-3 w-3" strokeWidth={2} />
+                        Vetted
+                      </Badge>
+                    )}
+                  </div>
+                </CardHeader>
 
-      {!isAuthor && directReplies.length > 0 && (
-        <section className="border-t border-border pt-8">
-          <p className="mb-5 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-            Replies · {totalReplyCount}
-          </p>
-          <ParliaventDebateThread
-            comments={replyComments}
-            getMeta={getReplyMeta}
-            onOpenPost={(id) => onThreadOpen?.(id)}
-            onReply={(id) => onThreadReply?.(id)}
-            onDeskBang={(id) => onThreadDeskBang?.(id)}
-          />
-        </section>
-      )}
-        </>
-      )}
+                <CardContent className="space-y-5 px-5 pb-6 md:px-6">
+                  {(argument.contestedFallacies?.length ?? 0) > 0 && (
+                    <div className="space-y-2 rounded-lg border border-border/80 bg-muted/30 px-4 py-3">
+                      <div className="flex flex-wrap gap-2">
+                        {argument.contestedFallacies!.map((fallacy) => (
+                          <ContestedChip key={fallacy} fallacyName={fallacy} />
+                        ))}
+                      </div>
+                      <p className="text-xs leading-relaxed text-muted-foreground">
+                        The judge flagged a possible fallacy. The author reviewed
+                        it, disagreed, and chose to post anyway.
+                      </p>
+                    </div>
+                  )}
+
+                  {argument.caveats?.map((caveat) => (
+                    <p
+                      key={caveat}
+                      className="text-sm italic text-muted-foreground"
+                    >
+                      {caveat}
+                    </p>
+                  ))}
+
+                  <div className="whitespace-pre-wrap text-base leading-relaxed text-foreground/90 md:text-[17px] md:leading-[1.75]">
+                    <CitationText
+                      segments={segments}
+                      sources={argument.sources}
+                      hoveredSourceIndex={hoveredSourceIndex}
+                      onSourceHover={setHoveredSourceIndex}
+                    />
+                  </div>
+
+                  {(argument.claimCaveats?.length ?? 0) > 0 && (
+                    <div className="space-y-2 border-t border-border pt-5">
+                      <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                        Source notes
+                      </p>
+                      {argument.claimCaveats!.map((caveat) => (
+                        <div
+                          key={caveat.id}
+                          className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3"
+                        >
+                          <p className="text-sm leading-relaxed text-foreground/90">
+                            &ldquo;{caveat.spanText}&rdquo;
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {caveat.message}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {!isAuthor && directReplies.length > 0 && (
+                <section className="border-t border-border pt-8">
+                  <p className="mb-5 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                    Replies · {totalReplyCount}
+                  </p>
+                  <div className="border-l-2 border-border/80 pl-4 md:pl-6">
+                    <ParliaventDebateThread
+                      comments={replyComments}
+                      getMeta={getReplyMeta}
+                      initialDepth={1}
+                      onOpenPost={(id) => onThreadOpen?.(id)}
+                      onReply={onThreadReply}
+                      onDeskBang={(id) => onThreadDeskBang?.(id)}
+                    />
+                  </div>
+                </section>
+              )}
+
+              {otherStarters.length > 0 && (
+                <section className="border-t border-border pt-8">
+                  <p className="mb-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                    Other arguments in this debate
+                  </p>
+                  <div className="space-y-3">
+                    {otherStarters.map((starter) => (
+                      <button
+                        key={starter.id}
+                        type="button"
+                        onClick={() => onThreadOpen?.(starter.id)}
+                        className="w-full rounded-lg border border-border bg-card/60 px-4 py-3 text-left transition-colors hover:bg-muted/30"
+                      >
+                        <p className="mb-1 text-xs text-muted-foreground">
+                          {starter.author} · {starter.postedAt}
+                        </p>
+                        <p className="line-clamp-2 text-sm text-foreground/85">
+                          {starter.text}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              )}
+            </>
+          )}
         </div>
 
         {!isLoading && argument.sources.length > 0 && (
-          <aside className="xl:sticky xl:top-24 xl:self-start">
+          <aside className="xl:sticky xl:top-[4.5rem] xl:self-start">
             <p className="mb-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">
               Sources
             </p>

@@ -2,7 +2,8 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { applyUserApprovedEdit } from "@/lib/applyUserEdit";
-import { persistPublishFlow } from "@/lib/api/persistence";
+import { excerptText } from "@/lib/excerptText";
+import { persistPublishFlow, createDebatePost } from "@/lib/api/persistence";
 import { buildPublishedArgument } from "@/lib/buildPublishedArgument";
 import { citationsFromFindings, sourcesFromFindings } from "@/lib/citationsFromFindings";
 import {
@@ -36,19 +37,25 @@ interface DebateAppProps {
 }
 
 export function DebateApp({ context, onBack, onPosted, onFinished }: DebateAppProps) {
+  const useMockSeed =
+    context.mode === "response" &&
+    !context.isSavedDebate &&
+    !context.debateId;
   const initialText =
     context.mode === "response"
-      ? SEED_RESPONSE
+      ? useMockSeed
+        ? SEED_RESPONSE
+        : (context.initialText ?? "")
       : (context.initialText ?? "");
   const [argumentText, setArgumentText] = useState(initialText);
   const judgeContext = useMemo(() => {
-    const parentArgument = context.parentId
-      ? getPost(context.parentId)?.text
-      : undefined;
+    const parentArgument =
+      context.parentArgument ??
+      (context.parentId ? getPost(context.parentId)?.text : undefined);
 
     return {
       mode: context.judgeMode ?? "structured_debate",
-      threadId: context.issueId,
+      threadId: context.debateId ?? context.issueId,
       motion: context.issueTitle,
       postType:
         context.mode === "response"
@@ -239,13 +246,62 @@ export function DebateApp({ context, onBack, onPosted, onFinished }: DebateAppPr
         id: context.dbPostId,
         debateId: context.debateId,
         dbPostId: context.dbPostId,
-        author: context.debateId ? "Guest" : undefined,
+        author: context.debateId || context.isSavedDebate ? "Guest" : undefined,
       }),
     [argumentText, findings, context],
   );
 
   const handlePost = useCallback(async () => {
     setPublishError(null);
+
+    if (context.debateId && context.isSavedDebate) {
+      setIsPublishing(true);
+      try {
+        let postId = context.dbPostId;
+
+        if (!postId) {
+          if (context.mode === "response" && context.parentDbPostId) {
+            const { post } = await createDebatePost({
+              debateId: context.debateId,
+              postType: "reply",
+              parentPostId: context.parentDbPostId,
+              text: argumentText,
+              authorName: "Guest",
+            });
+            postId = post.id;
+          } else if (context.mode === "starter") {
+            const { post } = await createDebatePost({
+              debateId: context.debateId,
+              postType: "starter",
+              text: argumentText,
+              authorName: "Guest",
+            });
+            postId = post.id;
+          }
+        }
+
+        if (!postId) {
+          throw new Error("Could not save post");
+        }
+
+        const saved = await persistPublishFlow(
+          postId,
+          argumentText,
+          findings,
+          "Guest",
+        );
+        setPublishedArgument(saved);
+        onPosted(saved);
+        setCurrentView("published");
+      } catch (err) {
+        setPublishError(
+          err instanceof Error ? err.message : "Failed to publish post",
+        );
+      } finally {
+        setIsPublishing(false);
+      }
+      return;
+    }
 
     if (context.dbPostId) {
       setIsPublishing(true);
@@ -277,6 +333,10 @@ export function DebateApp({ context, onBack, onPosted, onFinished }: DebateAppPr
     context.dbPostId,
     draftPublishedArgument,
     findings,
+    context.debateId,
+    context.isSavedDebate,
+    context.mode,
+    context.parentDbPostId,
     onPosted,
   ]);
 

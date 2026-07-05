@@ -1,7 +1,7 @@
 import type { JudgeMode, JudgePostType, JudgeUserStance } from "@/lib/types";
 
 /** Bump when prompt behavior changes so server cache entries invalidate. */
-export const JUDGE_PROMPT_VERSION = "judge-v4-debate-context";
+export const JUDGE_PROMPT_VERSION = "judge-v5-reply-relevance";
 
 export interface JudgeDebateContext {
   threadId?: string;
@@ -123,6 +123,9 @@ Debate context rules:
 - If no parent argument is provided, do not pretend to know what the user is replying to.
 - Do not over-penalize short replies that are understandable given the motion or parent argument.
 - A reply that engages with the parent argument's logic or conditions is relevant even if it does not repeat the motion wording.
+- Off-topic replies that ignore the parent argument (e.g. a completely unrelated topic) should get a clarity finding for unclear relevance — not claim or fallacy.
+- Example relevant reply (0 clarity findings expected): "That only works if transit is already good enough to replace car trips."
+- Example off-topic reply (clarity finding expected): "Cookies should be banned from this building."
 
 Output shape:
 {

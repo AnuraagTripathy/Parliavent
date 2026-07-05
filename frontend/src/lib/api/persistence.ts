@@ -5,6 +5,7 @@ import type {
   Finding,
   JudgeMode,
   PublishedArgument,
+  SavedDebateSummary,
   SourceCredibility,
   SupportLevel,
 } from "@/lib/types";
@@ -66,6 +67,95 @@ export interface PublishPostResponse {
   post: PublishedArgument;
 }
 
+export interface ListDebatesResponse {
+  debates: SavedDebateSummary[];
+}
+
+export async function listDebates(): Promise<ListDebatesResponse> {
+  const res = await fetch("/api/debates");
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(
+      typeof err.error === "string" ? err.error : "Failed to load debates",
+    );
+  }
+
+  return res.json();
+}
+
+export interface CreateDebatePostRequest {
+  debateId: string;
+  postType: "starter" | "reply";
+  parentPostId?: string;
+  text?: string;
+  authorName?: string;
+}
+
+export interface CreateDebatePostResponse {
+  post: {
+    id: string;
+    debateId: string;
+    parentPostId: string | null;
+    text: string;
+    postType: "starter" | "reply";
+    authorName: string;
+    createdAt: string;
+  };
+  debate: {
+    id: string;
+    slug: string;
+    motion: string;
+    mode: JudgeMode;
+  };
+}
+
+/** @deprecated Use createDebatePost */
+export type CreateReplyRequest = CreateDebatePostRequest & {
+  parentPostId: string;
+};
+
+export async function createDebatePost(
+  payload: CreateDebatePostRequest,
+): Promise<CreateDebatePostResponse> {
+  const res = await fetch(`/api/debates/${payload.debateId}/posts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      postType: payload.postType,
+      parentPostId: payload.parentPostId,
+      text: payload.text ?? "",
+      authorName: payload.authorName ?? "Guest",
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(
+      typeof err.error === "string" ? err.error : "Failed to create post",
+    );
+  }
+
+  return res.json();
+}
+
+export async function createReply(
+  payload: CreateDebatePostRequest & { parentPostId: string },
+): Promise<CreateDebatePostResponse> {
+  return createDebatePost({ ...payload, postType: "reply" });
+}
+
+export async function deleteDraftPost(postId: string): Promise<void> {
+  const res = await fetch(`/api/posts/${postId}`, { method: "DELETE" });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(
+      typeof err.error === "string" ? err.error : "Failed to delete draft",
+    );
+  }
+}
+
 export async function createDebate(
   payload: CreateDebateRequest,
 ): Promise<CreateDebateResponse> {
@@ -87,7 +177,12 @@ export async function createDebate(
 
 export async function fetchDebate(
   debateId: string,
-): Promise<{ debate: CreateDebateResponse["debate"] & { posts: PublishedArgument[] } }> {
+): Promise<{
+  debate: CreateDebateResponse["debate"] & {
+    updatedAt?: string;
+    posts: PublishedArgument[];
+  };
+}> {
   const res = await fetch(`/api/debates/${debateId}`);
 
   if (!res.ok) {

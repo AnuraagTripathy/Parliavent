@@ -1,8 +1,39 @@
 import { NextResponse } from "next/server";
 import type { DebateMode } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { toSavedDebateSummary } from "@/lib/db/mappers";
 import { slugFromMotion } from "@/lib/db/slug";
 import type { JudgeMode } from "@/lib/types";
+
+const debateListInclude = {
+  posts: {
+    include: {
+      _count: {
+        select: { findings: true, caveats: true },
+      },
+    },
+    orderBy: { createdAt: "asc" as const },
+  },
+} as const;
+
+export async function GET() {
+  try {
+    const debates = await prisma.debate.findMany({
+      orderBy: { updatedAt: "desc" },
+      include: debateListInclude,
+    });
+
+    return NextResponse.json({
+      debates: debates.map(toSavedDebateSummary),
+    });
+  } catch (error) {
+    console.error("GET /api/debates failed:", error);
+    return NextResponse.json(
+      { error: "Failed to load debates" },
+      { status: 500 },
+    );
+  }
+}
 
 const VALID_MODES: JudgeMode[] = [
   "open_floor",

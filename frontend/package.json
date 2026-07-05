@@ -7,10 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev",
-    "db:push": "prisma db push",
-    "db:studio": "prisma studio"
+    "db:generate": "node scripts/with-env.mjs generate",
+    "db:migrate": "node scripts/with-env.mjs migrate dev",
+    "db:push": "node scripts/with-env.mjs db push",
+    "db:studio": "node scripts/with-env.mjs studio",
+    "db:clear": "node scripts/clear-debates.mjs"
   },
   "dependencies": {
     "@paper-design/shaders-react": "^0.0.77",

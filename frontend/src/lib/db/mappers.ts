@@ -22,6 +22,7 @@ import type {
   JudgeMode,
   PostKind,
   PublishedArgument,
+  SavedDebateSummary,
   Source as AppSource,
   SourceCredibility,
   SupportLevel,
@@ -110,7 +111,7 @@ export function toAppFinding(
 
 export function toPublishedArgument(
   post: DbPostWithRelations,
-  debate: { id: string; slug: string },
+  debate: { id: string; slug: string; motion?: string; mode?: string },
 ): PublishedArgument {
   const findings = post.findings.map((f) => toAppFinding(f));
   const sources = sourcesFromFindings(findings);
@@ -167,6 +168,69 @@ export function toPublishedArgument(
         : undefined,
     debateId: debate.id,
     dbPostId: post.id,
+    publishedAt: post.publishedAt?.toISOString() ?? null,
+    debateMotion: debate.motion,
+    debateMode: debate.mode as JudgeMode | undefined,
+  };
+}
+
+const PREVIEW_MAX_LENGTH = 160;
+
+export function previewText(text: string): string {
+  const trimmed = text.trim();
+  if (trimmed.length <= PREVIEW_MAX_LENGTH) return trimmed;
+  return `${trimmed.slice(0, PREVIEW_MAX_LENGTH).trim()}…`;
+}
+
+export function toSavedDebateSummary(
+  debate: {
+    id: string;
+    slug: string;
+    motion: string;
+    mode: string;
+    createdAt: Date;
+    updatedAt: Date;
+    posts: Array<{
+      id: string;
+      text: string;
+      postType: string;
+      parentPostId: string | null;
+      authorName: string;
+      publishedAt: Date | null;
+      _count: { findings: number; caveats: number };
+    }>;
+  },
+): SavedDebateSummary {
+  const starter =
+    debate.posts.find(
+      (p) => p.postType === "starter" && p.parentPostId === null,
+    ) ?? debate.posts.find((p) => p.postType === "starter");
+
+  let findingCount = 0;
+  let caveatCount = 0;
+  for (const post of debate.posts) {
+    findingCount += post._count.findings;
+    caveatCount += post._count.caveats;
+  }
+
+  return {
+    id: debate.id,
+    slug: debate.slug,
+    motion: debate.motion,
+    mode: debate.mode as JudgeMode,
+    createdAt: debate.createdAt.toISOString(),
+    updatedAt: debate.updatedAt.toISOString(),
+    starterPost: starter
+      ? {
+          id: starter.id,
+          preview: previewText(starter.text),
+          authorName: starter.authorName,
+          publishedAt: starter.publishedAt?.toISOString() ?? null,
+        }
+      : null,
+    postCount: debate.posts.length,
+    findingCount,
+    caveatCount,
   };
 }
 

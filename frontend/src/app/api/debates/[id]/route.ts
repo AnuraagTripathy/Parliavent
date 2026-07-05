@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { toPublishedArgument } from "@/lib/db/mappers";
+import { isVisibleDbPost } from "@/lib/db/postVisibility";
 
 const postInclude = {
   findings: {
@@ -36,9 +37,8 @@ export async function GET(
       return NextResponse.json({ error: "Debate not found" }, { status: 404 });
     }
 
-    const posts = debate.posts.map((post) =>
-      toPublishedArgument(post, debate),
-    );
+    const visiblePosts = debate.posts.filter(isVisibleDbPost);
+    const posts = visiblePosts.map((post) => toPublishedArgument(post, debate));
 
     return NextResponse.json({
       debate: {

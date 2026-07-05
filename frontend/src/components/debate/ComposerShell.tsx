@@ -2,6 +2,7 @@
 
 import { ArrowLeft, MessageSquare, PenLine } from "lucide-react";
 import type { ComposerContext } from "@/lib/types";
+import { excerptText } from "@/lib/excerptText";
 import { Button } from "@/components/ui/button";
 
 interface ComposerShellProps {
@@ -56,17 +57,17 @@ export function ComposerShell({
               <h1 className="mt-0.5 text-lg font-bold leading-snug text-foreground sm:text-xl">
                 {context.issueTitle}
               </h1>
-              {isResponse && context.parentAuthor && (
+              {isResponse && (context.parentPreview || context.parentArgument) && (
                 <div className="mt-3 rounded-lg border border-border bg-background/60 px-3.5 py-3">
-                  <p className="mb-1 text-[11px] font-semibold text-muted-foreground">
-                    Replying to{" "}
-                    <span className="text-foreground/80">{context.parentAuthor}</span>
+                  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Replying to
                   </p>
-                  {context.parentPreview && (
-                    <p className="line-clamp-2 text-[13px] leading-relaxed text-foreground/70">
-                      &ldquo;{context.parentPreview}&rdquo;
-                    </p>
-                  )}
+                  <p className="line-clamp-3 text-[13px] leading-relaxed text-foreground/80">
+                    &ldquo;
+                    {context.parentPreview ??
+                      excerptText(context.parentArgument ?? "", 160)}
+                    &rdquo;
+                  </p>
                 </div>
               )}
               <p className="mt-2 text-[12px] text-muted-foreground">

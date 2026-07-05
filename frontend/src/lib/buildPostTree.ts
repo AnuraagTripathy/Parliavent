@@ -1,4 +1,10 @@
-import type { PublishedArgument } from "./types";
+import type { PublishedArgument } from "@/lib/types";
+
+/** Client-side: only show posts worth displaying in the thread. */
+export function isVisiblePublishedPost(post: PublishedArgument): boolean {
+  if (post.publishedAt) return true;
+  return post.text.trim().length > 0;
+}
 
 export interface PostNode {
   post: PublishedArgument;
@@ -10,7 +16,7 @@ export function getChildren(
   parentId: string,
 ): PublishedArgument[] {
   return posts
-    .filter((p) => p.parentId === parentId)
+    .filter((p) => p.parentId === parentId && isVisiblePublishedPost(p))
     .sort((a, b) => (b.deskBangs ?? 0) - (a.deskBangs ?? 0));
 }
 

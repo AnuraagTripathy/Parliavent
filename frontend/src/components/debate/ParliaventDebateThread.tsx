@@ -25,7 +25,7 @@ interface DebateCommentProps {
   meta: DebateCommentMeta;
   depth?: number;
   onOpenPost: (id: string) => void;
-  onReply: (id: string) => void;
+  onReply?: (id: string) => void;
   onDeskBang: (id: string) => void;
   getMeta: (id: string | number) => DebateCommentMeta | undefined;
 }
@@ -126,15 +126,17 @@ function DebateComment({
                   layout="horizontal"
                   size="sm"
                 />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2 text-xs"
-                  onClick={() => onReply(String(comment.id))}
-                >
-                  <Reply className="mr-1 h-3 w-3" />
-                  Reply
-                </Button>
+                {onReply && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => onReply(String(comment.id))}
+                  >
+                    <Reply className="mr-1 h-3 w-3" />
+                    Reply
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   size="sm"
@@ -187,8 +189,9 @@ interface ParliaventDebateThreadProps {
   comments: CommentType[];
   getMeta: (id: string | number) => DebateCommentMeta | undefined;
   onOpenPost: (id: string) => void;
-  onReply: (id: string) => void;
+  onReply?: (id: string) => void;
   onDeskBang: (id: string) => void;
+  initialDepth?: number;
 }
 
 export function ParliaventDebateThread({
@@ -197,6 +200,7 @@ export function ParliaventDebateThread({
   onOpenPost,
   onReply,
   onDeskBang,
+  initialDepth = 0,
 }: ParliaventDebateThreadProps) {
   if (comments.length === 0) {
     return (
@@ -217,6 +221,7 @@ export function ParliaventDebateThread({
             <DebateComment
               comment={comment}
               meta={meta}
+              depth={initialDepth}
               onOpenPost={onOpenPost}
               onReply={onReply}
               onDeskBang={onDeskBang}
