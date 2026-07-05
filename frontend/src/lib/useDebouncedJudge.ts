@@ -6,13 +6,30 @@ import {
   JUDGE_DEBOUNCE_MS,
   JUDGE_ERROR_MESSAGE,
   JUDGE_MIN_CHARS,
-  JUDGE_THREAD_ID,
   mergeFindings,
+  type JudgeCallContext,
 } from "@/lib/api/judge";
 import { normalizeJudgeText } from "@/lib/normalizeJudgeText";
 import type { CheckingState, Finding } from "@/lib/types";
 
-export function useDebouncedJudge(text: string) {
+function buildClientCacheKey(
+  normalizedText: string,
+  context: JudgeCallContext,
+): string {
+  return [
+    normalizedText,
+    context.mode ?? "structured_debate",
+    context.motion ?? "",
+    context.postType ?? "",
+    normalizeJudgeText(context.parentArgument ?? ""),
+    normalizeJudgeText(context.threadSummary ?? ""),
+  ].join("\0");
+}
+
+export function useDebouncedJudge(
+  text: string,
+  judgeContext: JudgeCallContext = {},
+) {
   const [findings, setFindings] = useState<Finding[]>([]);
   const [checkingState, setCheckingState] = useState<CheckingState>("idle");
   const [judgeError, setJudgeError] = useState<string | null>(null);
@@ -23,13 +40,23 @@ export function useDebouncedJudge(text: string) {
   const abortControllerRef = useRef<AbortController | null>(null);
   const cacheRef = useRef(new Map<string, Finding[]>());
   const textRef = useRef(text);
+  const judgeContextRef = useRef(judgeContext);
 
   useEffect(() => {
     textRef.current = text;
   }, [text]);
 
+  useEffect(() => {
+    judgeContextRef.current = judgeContext;
+  }, [judgeContext]);
+
   const runJudge = useCallback(
-    async (rawText: string, requestId: number, signal: AbortSignal) => {
+    async (
+      rawText: string,
+      requestId: number,
+      signal: AbortSignal,
+      context: JudgeCallContext,
+    ) => {
       const normalized = normalizeJudgeText(rawText);
 
       if (normalized.length < JUDGE_MIN_CHARS) {
@@ -43,7 +70,8 @@ export function useDebouncedJudge(text: string) {
 
       setIsTooShort(false);
 
-      const cached = cacheRef.current.get(normalized);
+      const cacheKey = buildClientCacheKey(normalized, context);
+      const cached = cacheRef.current.get(cacheKey);
       if (cached) {
         if (requestId !== requestIdRef.current) return;
         setFindings((previous) => mergeFindings(previous, cached, rawText));
@@ -58,8 +86,13 @@ export function useDebouncedJudge(text: string) {
       try {
         const { findings: nextFindings } = await fetchJudge({
           text: rawText,
-          mode: "structured_debate",
-          threadId: JUDGE_THREAD_ID,
+          mode: context.mode ?? "structured_debate",
+          threadId: context.threadId,
+          motion: context.motion,
+          postType: context.postType,
+          parentArgument: context.parentArgument,
+          threadSummary: context.threadSummary,
+          userStance: context.userStance,
           signal,
         });
 
@@ -67,7 +100,7 @@ export function useDebouncedJudge(text: string) {
           return;
         }
 
-        cacheRef.current.set(normalized, nextFindings);
+        cacheRef.current.set(cacheKey, nextFindings);
         setFindings((previous) => mergeFindings(previous, nextFindings, rawText));
         setCheckingState("complete");
       } catch {
@@ -102,7 +135,7 @@ export function useDebouncedJudge(text: string) {
       abortControllerRef.current = controller;
       const requestId = ++requestIdRef.current;
 
-      void runJudge(rawText, requestId, controller.signal);
+      void runJudge(rawText, requestId, controller.signal, judgeContextRef.current);
     },
     [cancelPendingJudge, runJudge],
   );
@@ -117,7 +150,12 @@ export function useDebouncedJudge(text: string) {
       debounceTimeoutRef.current = window.setTimeout(() => {
         debounceTimeoutRef.current = null;
         const requestId = ++requestIdRef.current;
-        void runJudge(rawText, requestId, controller.signal);
+        void runJudge(
+          rawText,
+          requestId,
+          controller.signal,
+          judgeContextRef.current,
+        );
       }, JUDGE_DEBOUNCE_MS);
     },
     [cancelPendingJudge, runJudge],
@@ -133,7 +171,7 @@ export function useDebouncedJudge(text: string) {
     return () => {
       cancelPendingJudge();
     };
-  }, [text, scheduleJudge, cancelPendingJudge]);
+  }, [text, judgeContext, scheduleJudge, cancelPendingJudge]);
 
   return {
     findings,

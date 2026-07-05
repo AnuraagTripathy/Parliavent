@@ -1,4 +1,16 @@
-import type { JudgeMode } from "@/lib/types";
+import type { JudgeMode, JudgePostType, JudgeUserStance } from "@/lib/types";
+
+/** Bump when prompt behavior changes so server cache entries invalidate. */
+export const JUDGE_PROMPT_VERSION = "judge-v4-debate-context";
+
+export interface JudgeDebateContext {
+  threadId?: string;
+  motion?: string;
+  postType?: JudgePostType;
+  parentArgument?: string;
+  threadSummary?: string;
+  userStance?: JudgeUserStance;
+}
 
 const MODE_LABELS: Record<JudgeMode, string> = {
   open_floor: "open-floor debate",
@@ -47,22 +59,32 @@ Cautious policy judgment rules:
 - If a sentence uses cautious language like "may", "might", "could", "if", "can", or "tend to", and does not include a statistic, historical fact, universal claim, or strong causal assertion, usually do NOT return a claim finding.
 - For cautious policy judgments, prefer no finding.
 - If the wording is vague but not misleading, prefer no finding; if a light touch is needed, use a clarity finding instead of a claim finding.
-- Phrases like "work better", "is better", "makes sense", and similar evaluative phrases should NOT be treated as factual claims unless tied to a specific measurable outcome.
-- Example that should usually get 0 findings or at most a light clarity finding:
+- Phrases like "work better", "is better", "makes sense", "seems reasonable", and similar evaluative phrases are policy judgments — NOT factual claims. Do NOT return type "claim" for them unless they cite a specific measurable outcome, statistic, study, or universal causal fact.
+- A sentence that states what policy "makes sense" or what "is better" for a stated goal is the author giving their view. That is allowed in debate. Return 0 findings unless the wording is emotionally loaded or genuinely confusing.
+- Do NOT suggest the author needs data or a source merely to justify a reasonable policy preference.
+- Example that should get 0 findings:
+  "A full ban makes sense for pedestrian safety in dense cores."
+- Example that should get 0 findings or at most a light clarity finding:
   "Partial bans may work better than full bans if deliveries still need access."
 - Claims using words like "may", "might", "could", "often", "some", or "if" are usually less severe and should not be flagged unless still misleading or unclear.
 
-Still flag strong empirical claims, for example:
-- "Studies prove congestion pricing always cuts emissions by 40% within one year."
+Contrast — these ARE claim findings (specific, empirical, or comparative-as-fact):
+- "Europe does it and their cities are way nicer." — vague factual comparison presented as fact, not a hedged policy view.
+- "Studies prove congestion pricing always cuts emissions by 40% within one year." — specific statistic and causal certainty.
 
-Still flag obviously bad arguments, for example:
-- "Everyone who supports remote work is just lazy."
+Insults and character attacks — NOT claim findings:
+- When a sentence attacks a group's character, motives, or intelligence instead of the policy ("everyone who X is just Y", "people who support X are lazy"), the problem is reasoning or tone — NOT missing evidence.
+- Do NOT return type "claim" for insults or broad character judgments. Do NOT suggest attaching a source.
+- Prefer type "fallacy" when the reasoning error is clear (e.g. ad hominem). Use type "clarity" if the wording is inflammatory but the fallacy label feels too strong.
+- Example that should get a fallacy finding (NOT claim):
+  "Everyone who supports remote work is just lazy."
+- Still flag obviously bad arguments like the example above — but as fallacy or clarity, never as claim.
 
 Fallacy rules:
-- Be conservative with fallacy detection.
+- Be conservative with fallacy detection for subtle cases.
+- For clear personal attacks on opponents ("everyone who… is just…"), fallacy detection is appropriate — use type "fallacy", not "claim".
 - Only return a fallacy finding when the reasoning issue is clear.
 - If you are unsure whether something is a fallacy, use type "clarity" instead.
-- Do not label emotional or insulting language as a fallacy unless the reasoning error is clear.
 - Use possible language, such as "This could be read as a false dilemma."
 - Never accuse the author.
 - Prefer plain-language titles over jargon.
@@ -91,6 +113,17 @@ Output rules:
 - Do not return duplicate findings about the same underlying issue.
 - Cap the output at 5 findings maximum.
 
+Debate context rules:
+- Use the provided debate context to judge relevance.
+- If post type is "starter", evaluate whether the draft addresses the motion.
+- If post type is "reply", evaluate whether the draft responds to the parent argument in context.
+- Do not require every sentence to explicitly restate the motion or parent point.
+- Only flag relevance when the connection to the motion or parent argument is genuinely unclear.
+- Relevance issues must use type "clarity", not "claim" or "fallacy".
+- If no parent argument is provided, do not pretend to know what the user is replying to.
+- Do not over-penalize short replies that are understandable given the motion or parent argument.
+- A reply that engages with the parent argument's logic or conditions is relevant even if it does not repeat the motion wording.
+
 Output shape:
 {
   "findings": [
@@ -106,19 +139,49 @@ Output shape:
   ]
 }`;
 
+function buildDebateContextBlock(context?: JudgeDebateContext): string {
+  if (!context) {
+    return "";
+  }
+
+  const lines: string[] = ["Debate context:"];
+
+  if (context.motion) {
+    lines.push(`- Motion: ${context.motion}`);
+  }
+  if (context.postType) {
+    lines.push(`- Post type: ${context.postType}`);
+  }
+  if (context.userStance) {
+    lines.push(`- User stance: ${context.userStance}`);
+  }
+  if (context.parentArgument) {
+    lines.push(`- Parent argument: ${context.parentArgument}`);
+  }
+  if (context.threadSummary) {
+    lines.push(`- Thread summary: ${context.threadSummary}`);
+  }
+  if (context.threadId) {
+    lines.push(`- Thread id: ${context.threadId}`);
+  }
+
+  if (lines.length === 1) {
+    return "";
+  }
+
+  return `${lines.join("\n")}\n\n`;
+}
+
 export function buildJudgeUserPrompt(
   text: string,
   mode: JudgeMode,
-  threadId?: string,
+  context?: JudgeDebateContext,
 ): string {
   const modeLabel = MODE_LABELS[mode];
   const modeInstruction = MODE_INSTRUCTIONS[mode];
+  const debateContextBlock = buildDebateContextBlock(context);
 
-  const threadLine = threadId
-    ? `Thread context: ${threadId}\n`
-    : "";
-
-  return `${threadLine}Debate format: ${modeLabel}
+  return `${debateContextBlock}Debate format: ${modeLabel}
 Review instruction: ${modeInstruction}
 
 Analyze this draft argument and return findings JSON only.

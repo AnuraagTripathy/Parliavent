@@ -1,17 +1,30 @@
-import type { Finding, JudgeMode, JudgeResponse } from "@/lib/types";
+import type {
+  Finding,
+  JudgeMode,
+  JudgePostType,
+  JudgeRequest,
+  JudgeResponse,
+  JudgeUserStance,
+} from "@/lib/types";
 import { parseJudgeResponse } from "@/lib/validateJudgeResponse";
 
 export const JUDGE_DEBOUNCE_MS = 1500;
 export const JUDGE_MIN_CHARS = 40;
-export const JUDGE_THREAD_ID = "cars-downtown";
 export const JUDGE_ERROR_MESSAGE =
   "Couldn't refresh review. Your draft is safe.";
 
-export interface FetchJudgeParams {
-  text: string;
-  mode: JudgeMode;
-  threadId?: string;
+export type FetchJudgeParams = JudgeRequest & {
   signal?: AbortSignal;
+};
+
+export interface JudgeCallContext {
+  mode?: JudgeMode;
+  threadId?: string;
+  motion?: string;
+  postType?: JudgePostType;
+  parentArgument?: string;
+  threadSummary?: string;
+  userStance?: JudgeUserStance;
 }
 
 const PRESERVED_STATUSES = new Set<Finding["status"]>([
@@ -53,6 +66,11 @@ export function mergeFindings(
       status: existing.status,
       selectedSourceId: existing.selectedSourceId,
       disputeReason: existing.disputeReason,
+      sourceCandidates: existing.sourceCandidates,
+      claimKind: existing.claimKind,
+      evidenceClaimVerdict: existing.evidenceClaimVerdict,
+      evidenceSummary: existing.evidenceSummary,
+      sources: existing.sources,
     };
   });
 }
@@ -60,12 +78,26 @@ export async function fetchJudge({
   text,
   mode,
   threadId,
+  motion,
+  postType,
+  parentArgument,
+  threadSummary,
+  userStance,
   signal,
 }: FetchJudgeParams): Promise<JudgeResponse> {
   const response = await fetch("/api/judge", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, mode, threadId }),
+    body: JSON.stringify({
+      text,
+      mode,
+      threadId,
+      motion,
+      postType,
+      parentArgument,
+      threadSummary,
+      userStance,
+    }),
     signal,
   });
 

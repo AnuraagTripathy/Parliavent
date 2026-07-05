@@ -41,37 +41,50 @@ function CitationText({
   return (
     <>
       {segments.map((segment, i) => {
-        if (segment.citationIndex === undefined) {
+        if (segment.citationIndex !== undefined) {
+          const color = getCitationColor(segment.citationIndex);
+          const marker = segment.citationIndex + 1;
+          const sourceId = `source-${sources[segment.citationIndex]?.id}`;
+
           return (
-            <span key={i} className="text-zinc-200">
-              {segment.text}
+            <span key={i} className="relative">
+              <mark
+                className="rounded-sm underline decoration-2 underline-offset-[3px]"
+                style={{
+                  backgroundColor: `${color.bg}33`,
+                  textDecorationColor: color.underline,
+                }}
+              >
+                {segment.text}
+              </mark>
+              <a
+                href={`#${sourceId}`}
+                className="ml-0.5 inline-flex align-super text-[10px] font-bold no-underline transition-opacity hover:opacity-70"
+                style={{ color: color.marker }}
+                aria-label={`Source ${marker}`}
+              >
+                [{marker}]
+              </a>
             </span>
           );
         }
 
-        const color = getCitationColor(segment.citationIndex);
-        const marker = segment.citationIndex + 1;
-        const sourceId = `source-${sources[segment.citationIndex]?.id}`;
+        if (segment.caveatMessage) {
+          return (
+            <span key={i}>
+              <span className="underline decoration-dotted decoration-zinc-600/50 underline-offset-[3px]">
+                {segment.text}
+              </span>
+              <span className="ml-1.5 text-[11px] italic text-zinc-500">
+                {segment.caveatMessage}
+              </span>
+            </span>
+          );
+        }
 
         return (
-          <span key={i} className="relative">
-            <mark
-              className="rounded-sm underline decoration-2 underline-offset-[3px]"
-              style={{
-                backgroundColor: `${color.bg}33`,
-                textDecorationColor: color.underline,
-              }}
-            >
-              {segment.text}
-            </mark>
-            <a
-              href={`#${sourceId}`}
-              className="ml-0.5 inline-flex align-super text-[10px] font-bold no-underline transition-opacity hover:opacity-70"
-              style={{ color: color.marker }}
-              aria-label={`Source ${marker}`}
-            >
-              [{marker}]
-            </a>
+          <span key={i} className="text-zinc-200">
+            {segment.text}
           </span>
         );
       })}
@@ -140,6 +153,7 @@ export function PublishedArgumentView({
     argument.text,
     argument.citations,
     sourceIndex,
+    argument.claimCaveats ?? [],
   );
   const isAuthor = variant === "author";
   const issue = argument.issueId ? getIssue(argument.issueId) : undefined;

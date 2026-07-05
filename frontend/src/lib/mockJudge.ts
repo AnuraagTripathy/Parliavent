@@ -28,26 +28,6 @@ const MOCK_FINDING_TEMPLATES: Finding[] = [
     spanText: "Europe does it and their cities are way nicer",
     title: "This needs a source",
     reason: "A reader can wave this off without evidence behind it.",
-    sources: [
-      {
-        id: "source-1",
-        title: "Car-free streets and city livability",
-        publisher: "Urban Planning Review",
-        isSample: true,
-      },
-      {
-        id: "source-2",
-        title: "Oslo city center traffic reduction outcomes",
-        publisher: "City of Oslo policy brief",
-        isSample: true,
-      },
-      {
-        id: "source-3",
-        title: "Paris low-traffic zones, three-year review",
-        publisher: "Sample case study",
-        isSample: true,
-      },
-    ],
   },
   {
     id: "finding-fallacy-1",

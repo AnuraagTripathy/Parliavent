@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { CreateDebateScreen } from "./CreateDebateScreen";
 import { DebateFeed } from "./DebateFeed";
 import { DebateApp } from "./DebateApp";
 import { IssueThread } from "./IssueThread";
 import { PublishedArgumentView } from "./PublishedArgumentView";
 import { SiteHeader } from "./SiteHeader";
+import { generateThreadId } from "@/lib/generateThreadId";
 import { getIssue, getPost, MOCK_POSTS } from "@/lib/mockFeed";
 import type {
   AppScreen,
@@ -66,6 +68,25 @@ export function ParliaventApp() {
     });
   }
 
+  function startCustomDebate(draft: {
+    motion: string;
+    argument: string;
+    judgeMode: ComposerContext["judgeMode"];
+  }) {
+    startComposer({
+      mode: "starter",
+      issueId: generateThreadId(draft.motion),
+      issueTitle: draft.motion,
+      judgeMode: draft.judgeMode ?? "structured_debate",
+      initialText: draft.argument,
+      isCustomDebate: true,
+    });
+  }
+
+  function backFromCreate() {
+    navigateHome();
+  }
+
   function startReply(parentId: string) {
     const parent = getPost(parentId) ?? posts.find((p) => p.id === parentId);
     if (!parent?.issueId) return;
@@ -98,10 +119,15 @@ export function ParliaventApp() {
   }
 
   function backFromComposer() {
+    if (composerContext?.isCustomDebate) {
+      navigateHome();
+      return;
+    }
+
     if (composerContext?.parentId) {
       setScreen("issue");
       setSelectedIssueId(composerContext.issueId);
-    } else if (composerContext?.issueId) {
+    } else if (composerContext?.issueId && getIssue(composerContext.issueId)) {
       setScreen("issue");
       setSelectedIssueId(composerContext.issueId);
     } else {
@@ -111,15 +137,17 @@ export function ParliaventApp() {
   }
 
   const subtitle =
-    screen === "composer"
-      ? composerContext?.mode === "response"
-        ? "Write response"
-        : "Write starter"
-      : screen === "issue"
-        ? "Debate"
-        : screen === "post"
-          ? "Argument"
-          : undefined;
+    screen === "create"
+      ? "Create debate"
+      : screen === "composer"
+        ? composerContext?.mode === "response"
+          ? "Write response"
+          : "Write starter"
+        : screen === "issue"
+          ? "Debate"
+          : screen === "post"
+            ? "Argument"
+            : undefined;
 
   return (
     <div className="flex min-h-screen flex-col bg-zinc-950">
@@ -130,16 +158,20 @@ export function ParliaventApp() {
           if (next === "composer" && composerContext) setScreen("composer");
         }}
         subtitle={subtitle}
-        onCreateStarter={() => {
-          const issueId = selectedIssueId ?? "issue-cars";
-          startStarter(issueId);
-        }}
+        onCreateStarter={() => setScreen("create")}
       />
 
       {screen === "feed" && (
         <DebateFeed
           onOpenIssue={openIssue}
           onNewStarter={startStarter}
+        />
+      )}
+
+      {screen === "create" && (
+        <CreateDebateScreen
+          onBack={backFromCreate}
+          onContinue={startCustomDebate}
         />
       )}
 
@@ -194,6 +226,12 @@ export function ParliaventApp() {
           onBack={backFromComposer}
           onPosted={handlePosted}
           onFinished={() => {
+            if (composerContext.isCustomDebate) {
+              setComposerContext(null);
+              setScreen("post");
+              return;
+            }
+
             const issueId = composerContext.issueId;
             setComposerContext(null);
             setSelectedIssueId(issueId);

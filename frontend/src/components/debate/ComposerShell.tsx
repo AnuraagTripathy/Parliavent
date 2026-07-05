@@ -48,6 +48,9 @@ export function ComposerShell({
               <p className="text-[11px] font-bold uppercase tracking-widest text-zinc-600">
                 {isResponse ? "Reply" : "Starter"}
               </p>
+              <p className="mt-2 text-[11px] font-bold uppercase tracking-widest text-zinc-600">
+                Motion
+              </p>
               <h1 className="mt-0.5 text-lg font-bold leading-snug text-zinc-50 sm:text-xl">
                 {context.issueTitle}
               </h1>

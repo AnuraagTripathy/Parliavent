@@ -1,24 +1,20 @@
-import type { Finding, JudgeRequest } from "@/lib/types";
-import { sanitizeAIFindings } from "./schema";
-import { buildJudgeUserPrompt, JUDGE_SYSTEM_PROMPT } from "./prompts";
+import { getGroqModel } from "@/lib/judge/analyzeWithGroq";
+import type { EvidenceSource } from "@/lib/types";
+import {
+  buildEvidenceVerifierUserPrompt,
+  EVIDENCE_VERIFIER_SYSTEM_PROMPT,
+} from "./verifyPrompts";
+import {
+  parseVerifiedEvidenceOutput,
+  type VerifiedEvidenceResult,
+} from "./verifySchema";
 
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-export const DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile";
-const REQUEST_TIMEOUT_MS = 30_000;
+const REQUEST_TIMEOUT_MS = 25_000;
 
-export function getGroqModel(): string {
-  return process.env.GROQ_MODEL?.trim() || DEFAULT_GROQ_MODEL;
-}
-
-function getGroqConfig() {
-  const apiKey = process.env.GROQ_API_KEY;
-  const model = getGroqModel();
-
-  if (!apiKey) {
-    throw new Error("GROQ_API_KEY is not configured");
-  }
-
-  return { apiKey, model };
+function getGroqApiKey(): string | null {
+  const apiKey = process.env.GROQ_API_KEY?.trim();
+  return apiKey || null;
 }
 
 function extractJsonContent(content: string): unknown {
@@ -32,19 +28,19 @@ function extractJsonContent(content: string): unknown {
   }
 }
 
-export async function analyzeWithGroq(params: JudgeRequest): Promise<Finding[]> {
-  const { apiKey, model } = getGroqConfig();
+export async function verifyEvidenceWithGroq(params: {
+  claim: string;
+  argumentText?: string;
+  sources: EvidenceSource[];
+}): Promise<VerifiedEvidenceResult> {
+  const apiKey = getGroqApiKey();
+  if (!apiKey) {
+    throw new Error("GROQ_API_KEY is not configured");
+  }
+
+  const sourceIds = new Set(params.sources.map((source) => source.id));
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-  const debateContext = {
-    threadId: params.threadId,
-    motion: params.motion,
-    postType: params.postType,
-    parentArgument: params.parentArgument,
-    threadSummary: params.threadSummary,
-    userStance: params.userStance,
-  };
 
   try {
     const response = await fetch(GROQ_API_URL, {
@@ -54,18 +50,18 @@ export async function analyzeWithGroq(params: JudgeRequest): Promise<Finding[]> 
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model,
-        temperature: 0.2,
+        model: getGroqModel(),
+        temperature: 0.1,
         response_format: { type: "json_object" },
         messages: [
-          { role: "system", content: JUDGE_SYSTEM_PROMPT },
+          { role: "system", content: EVIDENCE_VERIFIER_SYSTEM_PROMPT },
           {
             role: "user",
-            content: buildJudgeUserPrompt(
-              params.text,
-              params.mode,
-              debateContext,
-            ),
+            content: buildEvidenceVerifierUserPrompt({
+              claim: params.claim,
+              argumentText: params.argumentText,
+              sources: params.sources,
+            }),
           },
         ],
       }),
@@ -75,7 +71,7 @@ export async function analyzeWithGroq(params: JudgeRequest): Promise<Finding[]> 
     if (!response.ok) {
       const detail = await response.text().catch(() => "");
       throw new Error(
-        `Groq request failed (${response.status})${detail ? `: ${detail.slice(0, 200)}` : ""}`,
+        `Groq verifier failed (${response.status})${detail ? `: ${detail.slice(0, 200)}` : ""}`,
       );
     }
 
@@ -96,11 +92,20 @@ export async function analyzeWithGroq(params: JudgeRequest): Promise<Finding[]> 
       throw new Error("Groq returned empty content");
     }
 
-    const parsed = extractJsonContent(content);
-    return sanitizeAIFindings(parsed, params.text);
+    const parsed = parseVerifiedEvidenceOutput(
+      extractJsonContent(content),
+      sourceIds,
+      params.claim,
+    );
+
+    if (!parsed) {
+      throw new Error("Groq verifier returned invalid JSON");
+    }
+
+    return parsed;
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
-      throw new Error("Groq request timed out");
+      throw new Error("Groq verifier timed out");
     }
     throw error;
   } finally {

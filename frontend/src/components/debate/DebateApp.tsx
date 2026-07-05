@@ -4,14 +4,22 @@ import { useCallback, useMemo, useState } from "react";
 import { applyUserApprovedEdit } from "@/lib/applyUserEdit";
 import { buildPublishedArgument } from "@/lib/buildPublishedArgument";
 import { citationsFromFindings, sourcesFromFindings } from "@/lib/citationsFromFindings";
-import { SEED_ARGUMENT, SEED_RESPONSE } from "@/lib/mockJudge";
+import {
+  canMarkClaimAsOpinion,
+  classifyClaimKind,
+} from "@/lib/evidence/classifyClaimKind";
+import { SEED_RESPONSE } from "@/lib/mockJudge";
+import { getPost } from "@/lib/mockFeed";
 import { getOverlappingOpenFindings } from "@/lib/spanOverlap";
 import { useDebouncedJudge } from "@/lib/useDebouncedJudge";
 import type {
   ComposerContext,
   CurrentView,
+  EvidenceSearchResponse,
+  EvidenceSource,
   Finding,
   PublishedArgument,
+  Source,
 } from "@/lib/types";
 import { ArgumentEditor } from "./ArgumentEditor";
 import { ComposerShell } from "./ComposerShell";
@@ -27,8 +35,28 @@ interface DebateAppProps {
 }
 
 export function DebateApp({ context, onBack, onPosted, onFinished }: DebateAppProps) {
-  const initialText = context.mode === "response" ? SEED_RESPONSE : SEED_ARGUMENT;
+  const initialText =
+    context.mode === "response"
+      ? SEED_RESPONSE
+      : (context.initialText ?? "");
   const [argumentText, setArgumentText] = useState(initialText);
+  const judgeContext = useMemo(() => {
+    const parentArgument = context.parentId
+      ? getPost(context.parentId)?.text
+      : undefined;
+
+    return {
+      mode: context.judgeMode ?? "structured_debate",
+      threadId: context.issueId,
+      motion: context.issueTitle,
+      postType:
+        context.mode === "response"
+          ? ("reply" as const)
+          : ("starter" as const),
+      parentArgument,
+      userStance: "unknown" as const,
+    };
+  }, [context]);
   const {
     findings,
     setFindings,
@@ -36,7 +64,7 @@ export function DebateApp({ context, onBack, onPosted, onFinished }: DebateAppPr
     judgeError,
     isTooShort,
     checkNow,
-  } = useDebouncedJudge(argumentText);
+  } = useDebouncedJudge(argumentText, judgeContext);
   const [currentView, setCurrentView] = useState<CurrentView>("composer");
   const [pendingOverlapApply, setPendingOverlapApply] = useState<string | null>(
     null,
@@ -77,6 +105,45 @@ export function DebateApp({ context, onBack, onPosted, onFinished }: DebateAppPr
     [findings, setFindings],
   );
 
+  const applyRewrite = useCallback(
+    (findingId: string, replacement: string) => {
+      const finding = findings.find((f) => f.id === findingId);
+      if (!finding) return;
+
+      setArgumentText((text) =>
+        applyUserApprovedEdit({
+          text,
+          spanText: finding.spanText,
+          replacement,
+        }),
+      );
+
+      setFindings((prev) =>
+        prev.map((f) =>
+          f.id === findingId ? { ...f, status: "resolved" as const } : f,
+        ),
+      );
+      setPendingOverlapApply(null);
+    },
+    [findings, setFindings],
+  );
+
+  const requestApplyRewrite = useCallback(
+    (findingId: string, replacement: string) => {
+      const finding = findings.find((f) => f.id === findingId);
+      if (!finding) return;
+
+      const overlapping = getOverlappingOpenFindings(finding, findings);
+      if (overlapping.length > 0) {
+        setPendingOverlapApply(findingId);
+        return;
+      }
+
+      applyRewrite(findingId, replacement);
+    },
+    [findings, applyRewrite],
+  );
+
   const requestApplySuggestion = useCallback(
     (findingId: string) => {
       const finding = findings.find((f) => f.id === findingId);
@@ -100,11 +167,34 @@ export function DebateApp({ context, onBack, onPosted, onFinished }: DebateAppPr
     [updateFinding],
   );
 
-  const attachSource = useCallback(
-    (findingId: string, sourceId: string) => {
+  const setSourceSearchResult = useCallback(
+    (findingId: string, result: EvidenceSearchResponse) => {
+      updateFinding(findingId, {
+        sourceCandidates: result.sources,
+        claimKind: result.claimKind,
+        evidenceClaimVerdict: result.claimVerdict,
+        evidenceSummary: result.summary,
+      });
+    },
+    [updateFinding],
+  );
+
+  const attachEvidenceSource = useCallback(
+    (findingId: string, evidenceSource: EvidenceSource) => {
+      if (!evidenceSource.canAttachAsSupport) {
+        return;
+      }
+      const source: Source = {
+        id: evidenceSource.id,
+        title: evidenceSource.title,
+        publisher: evidenceSource.publisher,
+        url: evidenceSource.url,
+        isSample: false,
+      };
       updateFinding(findingId, {
         status: "source_attached",
-        selectedSourceId: sourceId,
+        selectedSourceId: evidenceSource.id,
+        sources: [source],
       });
     },
     [updateFinding],
@@ -112,9 +202,18 @@ export function DebateApp({ context, onBack, onPosted, onFinished }: DebateAppPr
 
   const markAsOpinion = useCallback(
     (findingId: string) => {
-      updateFinding(findingId, { status: "marked_opinion" });
+      setFindings((prev) =>
+        prev.map((f) => {
+          if (f.id !== findingId) return f;
+          // Factual claims must go through the "Revise as opinion" flow —
+          // never silently dismissed as opinion.
+          const kind = f.claimKind ?? classifyClaimKind(f.spanText);
+          if (f.type === "claim" && !canMarkClaimAsOpinion(kind)) return f;
+          return { ...f, status: "marked_opinion" as const };
+        }),
+      );
     },
-    [updateFinding],
+    [setFindings],
   );
 
   const disputeFinding = useCallback(
@@ -171,6 +270,8 @@ export function DebateApp({ context, onBack, onPosted, onFinished }: DebateAppPr
         <aside className="w-full shrink-0 lg:w-[340px] xl:w-[380px]">
           <FindingsPanel
             findings={findings}
+            argumentText={argumentText}
+            threadId={context.issueId}
             checkingState={checkingState}
             judgeError={judgeError}
             isTooShort={isTooShort}
@@ -184,7 +285,9 @@ export function DebateApp({ context, onBack, onPosted, onFinished }: DebateAppPr
             onCancelOverlapApply={() => setPendingOverlapApply(null)}
             onUseSuggestion={requestApplySuggestion}
             onKeepAsIs={keepAsIs}
-            onAttachSource={attachSource}
+            onSourceSearchResult={setSourceSearchResult}
+            onAttachEvidenceSource={attachEvidenceSource}
+            onApplyRewrite={applyRewrite}
             onMarkAsOpinion={markAsOpinion}
             onDispute={disputeFinding}
           />

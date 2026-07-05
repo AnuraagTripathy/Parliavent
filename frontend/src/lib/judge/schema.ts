@@ -1,28 +1,6 @@
-import type { Finding, FindingType, Source } from "@/lib/types";
+import type { Finding, FindingType } from "@/lib/types";
 
 export const MAX_FINDINGS = 5;
-
-/** Sample sources so claim cards keep working in Groq mode (not real evidence). */
-export const SAMPLE_CLAIM_SOURCES: Source[] = [
-  {
-    id: "source-1",
-    title: "Car-free streets and city livability",
-    publisher: "Urban Planning Review",
-    isSample: true,
-  },
-  {
-    id: "source-2",
-    title: "Oslo city center traffic reduction outcomes",
-    publisher: "City of Oslo policy brief",
-    isSample: true,
-  },
-  {
-    id: "source-3",
-    title: "Paris low-traffic zones, three-year review",
-    publisher: "Sample case study",
-    isSample: true,
-  },
-];
 
 const FINDING_TYPES = new Set<FindingType>(["claim", "fallacy", "clarity"]);
 
@@ -129,10 +107,6 @@ function ensureUniqueIds(findings: Omit<Finding, "sources">[]): Finding[] {
     usedIds.add(id);
 
     const withSources: Finding = { ...finding, id };
-    if (finding.type === "claim") {
-      withSources.sources = SAMPLE_CLAIM_SOURCES;
-    }
-
     return withSources;
   });
 }

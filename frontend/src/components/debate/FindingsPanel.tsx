@@ -1,11 +1,13 @@
 "use client";
 
 import { motion } from "framer-motion";
-import type { CheckingState, Finding } from "@/lib/types";
+import type { CheckingState, EvidenceSearchResponse, EvidenceSource, Finding } from "@/lib/types";
 import { FindingCard } from "./FindingCard";
 
 interface FindingsPanelProps {
   findings: Finding[];
+  argumentText: string;
+  threadId?: string;
   checkingState?: CheckingState;
   judgeError?: string | null;
   isTooShort?: boolean;
@@ -15,13 +17,17 @@ interface FindingsPanelProps {
   onCancelOverlapApply?: () => void;
   onUseSuggestion: (findingId: string) => void;
   onKeepAsIs: (findingId: string) => void;
-  onAttachSource: (findingId: string, sourceId: string) => void;
+  onSourceSearchResult: (findingId: string, result: EvidenceSearchResponse) => void;
+  onAttachEvidenceSource: (findingId: string, source: EvidenceSource) => void;
+  onApplyRewrite: (findingId: string, replacement: string) => void;
   onMarkAsOpinion: (findingId: string) => void;
   onDispute: (findingId: string, reason: string) => void;
 }
 
 export function FindingsPanel({
   findings,
+  argumentText,
+  threadId,
   checkingState = "complete",
   judgeError = null,
   isTooShort = false,
@@ -31,7 +37,9 @@ export function FindingsPanel({
   onCancelOverlapApply,
   onUseSuggestion,
   onKeepAsIs,
-  onAttachSource,
+  onSourceSearchResult,
+  onAttachEvidenceSource,
+  onApplyRewrite,
   onMarkAsOpinion,
   onDispute,
 }: FindingsPanelProps) {
@@ -134,9 +142,13 @@ export function FindingsPanel({
           <div key={finding.id}>
             <FindingCard
               finding={finding}
+              argumentText={argumentText}
+              threadId={threadId}
               onUseSuggestion={onUseSuggestion}
               onKeepAsIs={onKeepAsIs}
-              onAttachSource={onAttachSource}
+              onSourceSearchResult={onSourceSearchResult}
+              onAttachEvidenceSource={onAttachEvidenceSource}
+              onApplyRewrite={onApplyRewrite}
               onMarkAsOpinion={onMarkAsOpinion}
               onDispute={onDispute}
             />
