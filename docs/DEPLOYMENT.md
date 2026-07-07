@@ -17,7 +17,7 @@ Vercel (free Hobby)          Render or Neon (free)
 
 **Recommended: [Neon](https://neon.tech) free tier** — free Postgres that does not expire.
 
-**If you use Render Postgres instead:** the free instance **expires 30 days after creation**; after a 14-day grace period Render deletes it *and all data*. Fine for a demo, not for anything you want to keep. The repo-root `render.yaml` blueprint provisions it.
+**If you use Render Postgres instead:** the free instance **expires 30 days after creation**; after a 14-day grace period Render deletes it *and all data*. Fine for a demo, not for anything you want to keep. (The `render.yaml` blueprint intentionally does not provision a database — add a `databases:` section yourself if you want one.)
 
 Either way, copy the **connection string** (must include `?sslmode=require` for most hosts; Neon/Render include it).
 
@@ -68,7 +68,7 @@ In the [Hexclave dashboard](https://app.hexclave.com) for the project:
 
 Skip this entirely for a first deploy — the UI falls back to sync `/api/evidence/search` when `FASTAPI_EVIDENCE_URL` is unset.
 
-1. In Render: **New → Blueprint**, point it at this repository (`render.yaml` at the repo root). It creates `parliavent-evidence-api` (FastAPI) + `parliavent-jobs` (Key Value) — and `parliavent-db` if you kept that section.
+1. In Render: **New → Blueprint**, point it at this repository (`render.yaml` at the repo root). It creates `parliavent-evidence-api` (FastAPI) + `parliavent-jobs` (Key Value).
 2. Set the prompted env vars: `NEXTJS_BASE_URL` = your Vercel URL, `EVIDENCE_INTERNAL_SECRET` = a long random string (e.g. `openssl rand -hex 32`).
 3. On Vercel, add: `FASTAPI_EVIDENCE_URL` = the Render service URL, `EVIDENCE_INTERNAL_SECRET` = the same value. Redeploy.
 

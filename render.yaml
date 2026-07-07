@@ -3,17 +3,13 @@
 # this blueprint provisions the database and the OPTIONAL async evidence stack.
 #
 # Free-tier caveats (see DEPLOYMENT.md):
-# - Free Render Postgres EXPIRES 30 DAYS after creation (14-day grace period,
-#   then the data is deleted). Neon/Supabase free Postgres does not expire.
 # - Free web services spin down after 15 min of inactivity (~1 min cold start).
 # - Free Key Value instances have no disk persistence (jobs are transient
 #   anyway — the app falls back to sync evidence search if this stack is down).
-
-databases:
-  - name: parliavent-db
-    plan: free
-    databaseName: parliavent
-    user: parliavent
+#
+# The Postgres database is NOT provisioned here — it lives on Neon (free tier,
+# no expiry). If you ever want Render Postgres instead, add a `databases:`
+# section with `plan: free` (note: free Render Postgres expires after 30 days).
 
 services:
   # ---------------------------------------------------------------------------

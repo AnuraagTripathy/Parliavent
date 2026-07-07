@@ -23,7 +23,7 @@ This directory is the git repository root (github.com/AnuraagTripathy/Parliavent
 ```
 Parliavent/                  ← git repo root (this directory)
 ├── docs/                    ← product specs + DEPLOYMENT.md
-├── render.yaml              ← Render blueprint (Postgres + optional evidence stack)
+├── render.yaml              ← Render blueprint (optional evidence stack; DB is on Neon)
 ├── frontend/                ← the real application: Next.js 16 full-stack app
 │   ├── prisma/              ← schema + migrations (Postgres)
 │   ├── scripts/             ← seed, evals, db helpers (run with tsx / node)
