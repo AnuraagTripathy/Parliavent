@@ -2,7 +2,6 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { applyUserApprovedEdit } from "@/lib/applyUserEdit";
-import { excerptText } from "@/lib/excerptText";
 import { persistPublishFlow, createDebatePost } from "@/lib/api/persistence";
 import { buildPublishedArgument } from "@/lib/buildPublishedArgument";
 import { citationsFromFindings, sourcesFromFindings } from "@/lib/citationsFromFindings";
@@ -26,17 +25,19 @@ import type {
 import { ArgumentEditor } from "./ArgumentEditor";
 import { ComposerShell } from "./ComposerShell";
 import { FindingsPanel } from "./FindingsPanel";
+import { ParentArgumentPanel } from "./ParentArgumentPanel";
 import { PublishedArgumentView } from "./PublishedArgumentView";
 import { ReadinessBar } from "./ReadinessBar";
 
 interface DebateAppProps {
   context: ComposerContext;
+  authorName: string;
   onBack: () => void;
   onPosted: (post: PublishedArgument) => void;
   onFinished: () => void;
 }
 
-export function DebateApp({ context, onBack, onPosted, onFinished }: DebateAppProps) {
+export function DebateApp({ context, authorName, onBack, onPosted, onFinished }: DebateAppProps) {
   const useMockSeed =
     context.mode === "response" &&
     !context.isSavedDebate &&
@@ -104,6 +105,7 @@ export function DebateApp({ context, onBack, onPosted, onFinished }: DebateAppPr
           text,
           spanText: finding.spanText,
           replacement: finding.suggestedRewrite!,
+          spanStart: finding.spanStart,
         }),
       );
 
@@ -127,6 +129,7 @@ export function DebateApp({ context, onBack, onPosted, onFinished }: DebateAppPr
           text,
           spanText: finding.spanText,
           replacement,
+          spanStart: finding.spanStart,
         }),
       );
 
@@ -138,22 +141,6 @@ export function DebateApp({ context, onBack, onPosted, onFinished }: DebateAppPr
       setPendingOverlapApply(null);
     },
     [findings, setFindings],
-  );
-
-  const requestApplyRewrite = useCallback(
-    (findingId: string, replacement: string) => {
-      const finding = findings.find((f) => f.id === findingId);
-      if (!finding) return;
-
-      const overlapping = getOverlappingOpenFindings(finding, findings);
-      if (overlapping.length > 0) {
-        setPendingOverlapApply(findingId);
-        return;
-      }
-
-      applyRewrite(findingId, replacement);
-    },
-    [findings, applyRewrite],
   );
 
   const requestApplySuggestion = useCallback(
@@ -186,6 +173,11 @@ export function DebateApp({ context, onBack, onPosted, onFinished }: DebateAppPr
         claimKind: result.claimKind,
         evidenceClaimVerdict: result.claimVerdict,
         evidenceSummary: result.summary,
+        evidenceShouldEscalate: result.shouldEscalate,
+        evidenceEscalationReason: result.escalationReason,
+        evidenceEscalationSignals: result.escalationSignals,
+        evidenceInvestigationTrace: result.investigationTrace,
+        evidenceMode: result.evidenceMode,
       });
     },
     [updateFinding],
@@ -246,9 +238,9 @@ export function DebateApp({ context, onBack, onPosted, onFinished }: DebateAppPr
         id: context.dbPostId,
         debateId: context.debateId,
         dbPostId: context.dbPostId,
-        author: context.debateId || context.isSavedDebate ? "Guest" : undefined,
+        author: context.debateId || context.isSavedDebate ? authorName : undefined,
       }),
-    [argumentText, findings, context],
+    [argumentText, findings, context, authorName],
   );
 
   const handlePost = useCallback(async () => {
@@ -266,7 +258,7 @@ export function DebateApp({ context, onBack, onPosted, onFinished }: DebateAppPr
               postType: "reply",
               parentPostId: context.parentDbPostId,
               text: argumentText,
-              authorName: "Guest",
+              authorName,
             });
             postId = post.id;
           } else if (context.mode === "starter") {
@@ -274,7 +266,7 @@ export function DebateApp({ context, onBack, onPosted, onFinished }: DebateAppPr
               debateId: context.debateId,
               postType: "starter",
               text: argumentText,
-              authorName: "Guest",
+              authorName,
             });
             postId = post.id;
           }
@@ -288,7 +280,7 @@ export function DebateApp({ context, onBack, onPosted, onFinished }: DebateAppPr
           postId,
           argumentText,
           findings,
-          "Guest",
+          authorName,
         );
         setPublishedArgument(saved);
         onPosted(saved);
@@ -310,7 +302,7 @@ export function DebateApp({ context, onBack, onPosted, onFinished }: DebateAppPr
           context.dbPostId,
           argumentText,
           findings,
-          "Guest",
+          authorName,
         );
         setPublishedArgument(saved);
         onPosted(saved);
@@ -351,10 +343,20 @@ export function DebateApp({ context, onBack, onPosted, onFinished }: DebateAppPr
     );
   }
 
+  const parentArgumentText =
+    context.parentArgument ??
+    (context.parentId ? getPost(context.parentId)?.text : undefined);
+
   return (
     <ComposerShell context={context} onBack={onBack}>
-      <div className="flex w-full flex-1 flex-col gap-8 px-4 pb-28 pt-8 md:px-8 lg:flex-row lg:px-12 xl:px-16 lg:pb-10">
-        <section className="min-h-[420px] min-w-0 flex-1 lg:min-h-0">
+      <div className="flex w-full flex-1 flex-col gap-6 px-4 pb-28 pt-6 md:px-8 lg:px-12 xl:px-16 lg:pb-10">
+        <section className="mx-auto w-full max-w-4xl">
+          {context.mode === "response" && parentArgumentText && (
+            <ParentArgumentPanel
+              text={parentArgumentText}
+              author={context.parentAuthor}
+            />
+          )}
           <ArgumentEditor
             text={argumentText}
             findings={findings}
@@ -367,7 +369,7 @@ export function DebateApp({ context, onBack, onPosted, onFinished }: DebateAppPr
           />
         </section>
 
-        <aside className="w-full shrink-0 lg:w-[min(420px,38%)]">
+        <section className="mx-auto w-full max-w-6xl">
           <FindingsPanel
             findings={findings}
             argumentText={argumentText}
@@ -391,7 +393,7 @@ export function DebateApp({ context, onBack, onPosted, onFinished }: DebateAppPr
             onMarkAsOpinion={markAsOpinion}
             onDispute={disputeFinding}
           />
-        </aside>
+        </section>
       </div>
 
       <ReadinessBar

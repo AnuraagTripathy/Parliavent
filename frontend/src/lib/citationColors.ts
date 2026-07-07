@@ -1,6 +1,3 @@
-import { getPost } from "./mockFeed";
-import type { PublishedArgument } from "./types";
-
 /** Dark-theme citation colors — tuned for #0c0a09 / #171412 backgrounds */
 export const CITATION_PALETTE = [
   { bg: "#3b82f6", underline: "#60a5fa", marker: "#93c5fd", ring: "#3b82f6" },
@@ -11,9 +8,4 @@ export const CITATION_PALETTE = [
 
 export function getCitationColor(sourceIndex: number) {
   return CITATION_PALETTE[sourceIndex % CITATION_PALETTE.length];
-}
-
-/** @deprecated Use getPost from mockFeed */
-export function getPublishedArgument(id: string): PublishedArgument | undefined {
-  return getPost(id);
 }

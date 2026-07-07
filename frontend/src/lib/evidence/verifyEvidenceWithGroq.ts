@@ -1,4 +1,5 @@
-import { getGroqModel } from "@/lib/judge/analyzeWithGroq";
+import { getGroqVerifierModel } from "@/lib/judge/analyzeWithGroq";
+import { recordGroqUsage } from "@/lib/groq/groqUsageTracker";
 import type { EvidenceSource } from "@/lib/types";
 import {
   buildEvidenceVerifierUserPrompt,
@@ -40,6 +41,15 @@ export async function verifyEvidenceWithGroq(params: {
   }
 
   const sourceIds = new Set(params.sources.map((source) => source.id));
+  const model = getGroqVerifierModel();
+  const userPrompt = buildEvidenceVerifierUserPrompt({
+    claim: params.claim,
+    argumentText: params.argumentText,
+    verificationBasis: params.verificationBasis,
+    sources: params.sources,
+  });
+  const inputChars =
+    EVIDENCE_VERIFIER_SYSTEM_PROMPT.length + userPrompt.length;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
@@ -51,19 +61,14 @@ export async function verifyEvidenceWithGroq(params: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: getGroqModel(),
+        model,
         temperature: 0.1,
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: EVIDENCE_VERIFIER_SYSTEM_PROMPT },
           {
             role: "user",
-            content: buildEvidenceVerifierUserPrompt({
-              claim: params.claim,
-              argumentText: params.argumentText,
-              verificationBasis: params.verificationBasis,
-              sources: params.sources,
-            }),
+            content: userPrompt,
           },
         ],
       }),
@@ -104,6 +109,7 @@ export async function verifyEvidenceWithGroq(params: {
       throw new Error("Groq verifier returned invalid JSON");
     }
 
+    recordGroqUsage(model, inputChars, content.length);
     return parsed;
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {

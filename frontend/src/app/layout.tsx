@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Cinzel, Cormorant_Garamond, Geist, Geist_Mono } from "next/font/google";
+import { HexclaveProvider, HexclaveTheme } from "@hexclave/next";
+import { hexclaveServerApp } from "@/hexclave/server";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -39,7 +42,13 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} ${cormorant.variable} ${cinzel.variable} h-full antialiased`}
     >
-      <body className="min-h-full font-sans">{children}</body>
+      <body className="min-h-full font-sans">
+        <HexclaveProvider app={hexclaveServerApp}>
+          <HexclaveTheme>
+            <Suspense fallback={null}>{children}</Suspense>
+          </HexclaveTheme>
+        </HexclaveProvider>
+      </body>
     </html>
   );
 }

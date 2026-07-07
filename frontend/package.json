@@ -7,16 +7,35 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "postinstall": "prisma generate",
     "db:generate": "node scripts/with-env.mjs generate",
+    "db:deploy": "prisma migrate deploy",
     "db:migrate": "node scripts/with-env.mjs migrate dev",
     "db:push": "node scripts/with-env.mjs db push",
     "db:studio": "node scripts/with-env.mjs studio",
-    "db:clear": "node scripts/clear-debates.mjs"
+    "db:clear": "node scripts/clear-debates.mjs",
+    "seed:showcase": "tsx scripts/seed-showcase-debates.ts",
+    "seed:showcase:evidence": "tsx scripts/seed-showcase-debates.ts --with-evidence",
+    "seed:showcase:evidence-only": "tsx scripts/seed-showcase-debates.ts --with-evidence",
+    "seed:showcase:judge": "tsx scripts/seed-showcase-debates.ts --with-judge",
+    "seed:showcase:realistic": "tsx scripts/seed-showcase-debates.ts --reset-showcase --with-judge --with-evidence",
+    "seed:showcase:reset": "tsx scripts/seed-showcase-debates.ts --reset-showcase",
+    "seed:showcase:grey-area": "tsx scripts/seed-showcase-grey-area.ts",
+    "seed:showcase:grey-area:judge": "tsx scripts/seed-showcase-grey-area.ts --with-judge",
+    "eval:evidence": "tsx scripts/run-evidence-evals.ts",
+    "eval:evidence:deep": "tsx scripts/run-evidence-evals.ts --mode deep",
+    "eval:evidence:auto": "tsx scripts/run-evidence-evals.ts --mode auto",
+    "eval:evidence:compare": "tsx scripts/run-evidence-evals.ts --compare",
+    "eval:evidence:all": "tsx scripts/run-evidence-evals.ts --all-modes"
   },
   "dependencies": {
+    "@hexclave/next": "^1.0.45",
     "@paper-design/shaders-react": "^0.0.77",
     "@prisma/client": "^6.19.3",
     "@radix-ui/react-avatar": "^1.2.1",
+    "@radix-ui/react-scroll-area": "^1.2.14",
     "@radix-ui/react-slot": "^1.3.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -29,6 +48,7 @@
     "tw-animate-css": "^1.4.0"
   },
   "devDependencies": {
+    "@hexclave/cli": "^1.0.45",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
@@ -37,6 +57,8 @@
     "eslint-config-next": "16.2.9",
     "prisma": "^6.19.3",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "tsx": "^4.23.0",
+    "typescript": "^5",
+    "vitest": "^4.1.10"
   }
 }

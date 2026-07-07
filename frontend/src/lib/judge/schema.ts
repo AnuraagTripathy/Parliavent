@@ -1,4 +1,5 @@
 import type { Finding, FindingType } from "@/lib/types";
+import { spansOverlap } from "@/lib/spanOverlap";
 
 export const MAX_FINDINGS = 5;
 
@@ -74,12 +75,20 @@ export function parseAIJudgeOutput(data: unknown): Omit<Finding, "sources">[] | 
   return normalized;
 }
 
-/** Keep only findings whose span is an exact substring of the argument. */
+/**
+ * Keep only findings whose span is an exact substring of the argument,
+ * recording the anchored offset so repeated phrases stay unambiguous
+ * downstream (highlighting, user-approved edits).
+ */
 export function filterFindingsBySpan(
   findings: Omit<Finding, "sources">[],
   text: string,
 ): Omit<Finding, "sources">[] {
-  return findings.filter((finding) => text.includes(finding.spanText));
+  return findings.flatMap((finding) => {
+    const spanStart = text.indexOf(finding.spanText);
+    if (spanStart === -1) return [];
+    return [{ ...finding, spanStart }];
+  });
 }
 
 function dedupeFindings(findings: Omit<Finding, "sources">[]): Omit<Finding, "sources">[] {
@@ -94,6 +103,29 @@ function dedupeFindings(findings: Omit<Finding, "sources">[]): Omit<Finding, "so
   }
 
   return result;
+}
+
+/** Drop nested/overlapping findings of the same type — keep the broadest span. */
+function dedupeOverlappingFindings(
+  findings: Omit<Finding, "sources">[],
+): Omit<Finding, "sources">[] {
+  const sorted = [...findings].sort(
+    (a, b) => b.spanText.length - a.spanText.length,
+  );
+  const kept: Omit<Finding, "sources">[] = [];
+
+  for (const finding of sorted) {
+    const overlapsExisting = kept.some(
+      (existing) =>
+        existing.type === finding.type &&
+        spansOverlap(existing.spanText, finding.spanText),
+    );
+    if (!overlapsExisting) {
+      kept.push(finding);
+    }
+  }
+
+  return kept;
 }
 
 function ensureUniqueIds(findings: Omit<Finding, "sources">[]): Finding[] {
@@ -111,6 +143,149 @@ function ensureUniqueIds(findings: Omit<Finding, "sources">[]): Finding[] {
   });
 }
 
+const INFORMAL_FILLER_PATTERN =
+  /^(bro|dude|man|like|literally|basically|honestly|ngl|imo|tbh|kinda|sorta|fr|lowkey|highkey)[!.?]*$/i;
+
+const EMOTION_FALLACY_PATTERN = /appeal to emotion|appeal to fear|fear/i;
+
+const FACTUAL_CAUSAL_SPAN_PATTERN =
+  /\b(cause|causes|caused|induce|increase|risk|emit|emits|lead to|leads to|proven|proof|study|studies|percent|%|wave|radiation|link|linked)\b/i;
+
+function looksLikeInformalRegisterFallacy(
+  finding: Omit<Finding, "sources">,
+): boolean {
+  if (finding.type !== "fallacy") {
+    return false;
+  }
+
+  const span = finding.spanText.trim();
+  const wordCount = span.split(/\s+/).filter(Boolean).length;
+  const meta = `${finding.title} ${finding.reason} ${finding.subtitle ?? ""}`.toLowerCase();
+
+  const isShortSpan = wordCount <= 3 && span.length <= 28;
+  const mentionsInformalTone =
+    meta.includes("informal") ||
+    meta.includes("undermine credibility") ||
+    (meta.includes("credibility") && meta.includes("tone"));
+
+  if (!isShortSpan && !mentionsInformalTone) {
+    return false;
+  }
+
+  if (INFORMAL_FILLER_PATTERN.test(span)) {
+    return true;
+  }
+
+  if (
+    finding.subtitle &&
+    EMOTION_FALLACY_PATTERN.test(finding.subtitle) &&
+    wordCount <= 2
+  ) {
+    return true;
+  }
+
+  return mentionsInformalTone && isShortSpan;
+}
+
+function downgradeInformalRegisterFallacy(
+  finding: Omit<Finding, "sources">,
+): Omit<Finding, "sources"> {
+  return {
+    ...finding,
+    type: "clarity",
+    subtitle: undefined,
+    confidence: undefined,
+    example: undefined,
+    title: "Consider clearer wording",
+    reason:
+      "Informal filler or slang can distract readers in a written debate. A small wording tweak keeps your point without changing your stance.",
+  };
+}
+
+function looksLikeScareLanguageFallacyOnFactualClaim(
+  finding: Omit<Finding, "sources">,
+): boolean {
+  if (finding.type !== "fallacy") {
+    return false;
+  }
+
+  const meta = `${finding.subtitle ?? ""} ${finding.title} ${finding.reason}`;
+  if (!EMOTION_FALLACY_PATTERN.test(meta)) {
+    return false;
+  }
+
+  return FACTUAL_CAUSAL_SPAN_PATTERN.test(finding.spanText);
+}
+
+function downgradeScareLanguageFallacyToClaim(
+  finding: Omit<Finding, "sources">,
+): Omit<Finding, "sources"> {
+  return {
+    ...finding,
+    type: "claim",
+    subtitle: undefined,
+    confidence: undefined,
+    example: undefined,
+    title: "This claim needs evidence",
+    reason:
+      "This states a specific causal or mechanistic claim. Loaded wording is not a reasoning fallacy — readers may still expect evidence for the underlying assertion.",
+  };
+}
+
+const PRECISION_ISSUE_META_PATTERN =
+  /\b(specify|specified|type and level|amount|magnitude|clarify|more specific|more precise|what kind|which type|imprecise|unspecified|should be specified|needs clarification)\b/i;
+
+const CONTESTED_FACTUAL_SPAN_PATTERN =
+  /\b(cause|causes|caused|we know|proven|proof|always|never|\d+%|studies prove|study shows|linked to cancer|induce cancer)\b/i;
+
+function looksLikePrecisionIssueMislabeledAsClaim(
+  finding: Omit<Finding, "sources">,
+): boolean {
+  if (finding.type !== "claim") {
+    return false;
+  }
+
+  const meta = `${finding.title} ${finding.reason}`;
+  if (!PRECISION_ISSUE_META_PATTERN.test(meta)) {
+    return false;
+  }
+
+  return !CONTESTED_FACTUAL_SPAN_PATTERN.test(finding.spanText);
+}
+
+function downgradePrecisionClaimToClarity(
+  finding: Omit<Finding, "sources">,
+): Omit<Finding, "sources"> {
+  return {
+    ...finding,
+    type: "clarity",
+    title: finding.title.includes("Specify")
+      ? finding.title
+      : "Be more specific here",
+    reason:
+      finding.reason ||
+      "Readers may not know what exactly you mean. A more precise phrase helps — this is a wording issue, not a missing source.",
+  };
+}
+
+function adjustFindingToneAndType(
+  finding: Omit<Finding, "sources">,
+): Omit<Finding, "sources"> {
+  if (looksLikeInformalRegisterFallacy(finding)) {
+    return downgradeInformalRegisterFallacy(finding);
+  }
+
+  if (looksLikeScareLanguageFallacyOnFactualClaim(finding)) {
+    return downgradeScareLanguageFallacyToClaim(finding);
+  }
+
+  if (looksLikePrecisionIssueMislabeledAsClaim(finding)) {
+    return downgradePrecisionClaimToClarity(finding);
+  }
+
+  return finding;
+}
+
 /** Full server-side pipeline after JSON parse. */
 export function sanitizeAIFindings(
   raw: unknown,
@@ -123,6 +298,8 @@ export function sanitizeAIFindings(
 
   const spanMatched = filterFindingsBySpan(parsed, text);
   const deduped = dedupeFindings(spanMatched);
+  const toneAdjusted = deduped.map(adjustFindingToneAndType);
+  const overlapDeduped = dedupeOverlappingFindings(toneAdjusted);
 
-  return ensureUniqueIds(deduped.slice(0, MAX_FINDINGS));
+  return ensureUniqueIds(overlapDeduped.slice(0, MAX_FINDINGS));
 }

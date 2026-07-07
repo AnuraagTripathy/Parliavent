@@ -86,6 +86,30 @@ export interface EvidenceSearchRequest {
   claim: string;
   argumentText?: string;
   threadId?: string;
+  mode?: EvidenceSearchMode;
+  autoEscalate?: boolean;
+}
+
+export type EvidenceSearchMode = "standard" | "deep";
+
+export type EvidenceResultMode = "standard" | "deep" | "auto_escalated";
+
+export type DeepInvestigationStage =
+  | "standard_pipeline"
+  | "routing_evidence"
+  | "deep_classification"
+  | "deep_follow_up_search"
+  | "deep_source_review"
+  | "deep_verification";
+
+export interface AgentTraceStep {
+  step: number;
+  stage:
+    | "classification"
+    | "follow_up_search"
+    | "source_review"
+    | "verdict";
+  summary: string;
 }
 
 export interface EvidenceSearchResponse {
@@ -98,6 +122,54 @@ export interface EvidenceSearchResponse {
   evidencePassages?: string[];
   /** Whether Groq judged from page passages, snippets, or both. */
   verificationBasis?: "passages" | "snippets" | "mixed";
+  /** How this result was produced. */
+  evidenceMode?: EvidenceResultMode;
+  shouldEscalate?: boolean;
+  escalationReason?: string;
+  escalationSignals?: string[];
+  deepInvestigationAvailable?: boolean;
+  investigationTrace?: AgentTraceStep[];
+}
+
+export type EvidenceJobStatus = "queued" | "running" | "completed" | "failed";
+
+export type EvidenceJobStage =
+  | "queued"
+  | "searching"
+  | "fetching_pages"
+  | "extracting_passages"
+  | "ranking_passages"
+  | "verifying"
+  | "standard_pipeline"
+  | "routing_evidence"
+  | "deep_classification"
+  | "deep_follow_up_search"
+  | "deep_source_review"
+  | "deep_verification"
+  | "completed"
+  | "failed";
+
+export interface EvidenceJobCreateRequest {
+  claim: string;
+  argumentContext?: string;
+  threadId?: string;
+  findingId?: string;
+  mode?: EvidenceSearchMode;
+  autoEscalate?: boolean;
+}
+
+export interface EvidenceJobCreateResponse {
+  jobId: string;
+  status: "queued";
+}
+
+export interface EvidenceJobPollResponse {
+  jobId: string;
+  status: EvidenceJobStatus;
+  stage: EvidenceJobStage;
+  progress: number;
+  result?: EvidenceSearchResponse;
+  error?: string;
 }
 
 export interface Finding {
@@ -105,6 +177,13 @@ export interface Finding {
   type: FindingType;
   status: FindingStatus;
   spanText: string;
+  /**
+   * Character offset of the anchored occurrence of spanText, captured when
+   * the judge validated the span. Disambiguates repeated phrases; consumers
+   * must fall back to first-occurrence when the offset no longer matches
+   * (user edited text since the last judge run). Not persisted.
+   */
+  spanStart?: number;
   title: string;
   subtitle?: string;
   reason: string;
@@ -116,6 +195,11 @@ export interface Finding {
   claimKind?: ClaimKind;
   evidenceClaimVerdict?: ClaimVerdict;
   evidenceSummary?: string;
+  evidenceShouldEscalate?: boolean;
+  evidenceEscalationReason?: string;
+  evidenceEscalationSignals?: string[];
+  evidenceInvestigationTrace?: AgentTraceStep[];
+  evidenceMode?: EvidenceResultMode;
   selectedSourceId?: string;
   disputeReason?: string;
 }
@@ -131,6 +215,7 @@ export interface Citation {
   id: string;
   spanText: string;
   sourceId: string;
+  supportLevel?: SupportLevel;
 }
 
 export interface ClaimCaveat {
@@ -140,6 +225,35 @@ export interface ClaimCaveat {
   message: string;
 }
 
+export interface NeedsEvidenceNote {
+  id: string;
+  spanText: string;
+  title: string;
+  reason: string;
+}
+
+export interface ReviewFindingChip {
+  id: string;
+  type: FindingType;
+  spanText: string;
+  title: string;
+  reason: string;
+  subtitle?: string;
+}
+
+export interface PublishedReviewFinding {
+  id: string;
+  type: FindingType;
+  status: FindingStatus;
+  spanText: string;
+  title: string;
+  reason: string;
+  subtitle?: string;
+  evidenceClaimVerdict?: ClaimVerdict;
+  selectedSourceId?: string;
+  sources?: Source[];
+}
+
 export interface PublishedArgument {
   id: string;
   author: string;
@@ -147,7 +261,12 @@ export interface PublishedArgument {
   text: string;
   sources: Source[];
   citations: Citation[];
+  /** Saved judge findings used to derive thread review metadata. */
+  publishedFindings?: PublishedReviewFinding[];
   claimCaveats?: ClaimCaveat[];
+  needsEvidence?: NeedsEvidenceNote[];
+  reviewFallacies?: ReviewFindingChip[];
+  reviewClarity?: ReviewFindingChip[];
   contestedFallacies?: string[];
   caveats?: string[];
   kind?: PostKind;
@@ -184,7 +303,15 @@ export interface SavedDebateSummary {
   starterPost: SavedDebateStarterPreview | null;
   postCount: number;
   findingCount: number;
+  reviewNoteCount: number;
   caveatCount: number;
+  sourcedClaimCount: number;
+  contestedCount: number;
+  needsEvidenceCount: number;
+  hasCaveats: boolean;
+  hasSourced: boolean;
+  hasContested: boolean;
+  hasNeedsEvidence: boolean;
 }
 
 export interface Issue {

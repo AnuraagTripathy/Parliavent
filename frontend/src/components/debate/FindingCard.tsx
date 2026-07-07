@@ -3,13 +3,20 @@
 import { useState } from "react";
 import {
   EVIDENCE_EMPTY_MESSAGE,
-  EVIDENCE_ERROR_MESSAGE,
-  fetchEvidenceSearch,
+  EVIDENCE_JOB_FAILED_MESSAGE,
+  EVIDENCE_STAGE_COPY,
+  fetchEvidenceSearchWithJob,
   KEEP_AS_IS_CAVEAT_HINT,
 } from "@/lib/api/evidence";
 import { classifyClaimKind } from "@/lib/evidence/classifyClaimKind";
 import { buildOpinionFallbackRewrite } from "@/lib/evidence/opinionFallbackRewrite";
-import type { EvidenceSearchResponse, EvidenceSource, Finding, FindingType } from "@/lib/types";
+import type {
+  EvidenceJobStage,
+  EvidenceSearchResponse,
+  EvidenceSource,
+  Finding,
+  FindingType,
+} from "@/lib/types";
 import { AlertTriangle, BookOpen, Check, Loader2, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,6 +28,7 @@ interface FindingCardProps {
   finding: Finding;
   argumentText: string;
   threadId?: string;
+  layout?: "stack" | "carousel";
   onUseSuggestion: (findingId: string) => void;
   onKeepAsIs: (findingId: string) => void;
   onSourceSearchResult: (findingId: string, result: EvidenceSearchResponse) => void;
@@ -122,6 +130,7 @@ export function FindingCard({
   finding,
   argumentText,
   threadId,
+  layout = "stack",
   onUseSuggestion,
   onKeepAsIs,
   onSourceSearchResult,
@@ -147,27 +156,47 @@ export function FindingCard({
   const opinionRewrite =
     finding.suggestedRewrite ?? buildOpinionFallbackRewrite(finding.spanText);
 
-  const [fallacyExpanded, setFallacyExpanded] = useState(false);
+  const [fallacyGuideOpen, setFallacyGuideOpen] = useState(false);
+  const [fallacyFixOpen, setFallacyFixOpen] = useState(false);
   const [disputeOpen, setDisputeOpen] = useState(false);
   const [disputeReason, setDisputeReason] = useState("");
   const [revisePanelOpen, setRevisePanelOpen] = useState(false);
   const [sourceSearchLoading, setSourceSearchLoading] = useState(false);
+  const [sourceSearchStage, setSourceSearchStage] = useState<EvidenceJobStage | null>(
+    null,
+  );
   const [sourceSearchError, setSourceSearchError] = useState<string | null>(
     null,
   );
   const [sourceSearchEmpty, setSourceSearchEmpty] = useState(false);
+  const [deepSearchLoading, setDeepSearchLoading] = useState(false);
 
-  async function handleFindSources() {
-    setSourceSearchLoading(true);
+  async function handleFindSources(mode: "standard" | "deep" = "standard") {
+    const isDeep = mode === "deep";
+    if (isDeep) {
+      setDeepSearchLoading(true);
+    } else {
+      setSourceSearchLoading(true);
+    }
+    setSourceSearchStage("queued");
     setSourceSearchError(null);
     setSourceSearchEmpty(false);
 
     try {
-      const result = await fetchEvidenceSearch({
-        claim: finding.spanText,
-        argumentText,
-        threadId,
-      });
+      const result = await fetchEvidenceSearchWithJob(
+        {
+          claim: finding.spanText,
+          argumentText,
+          threadId,
+          findingId: finding.id,
+          mode,
+        },
+        {
+          onProgress: ({ stage }) => {
+            setSourceSearchStage(stage);
+          },
+        },
+      );
 
       if (result.sources.length === 0) {
         setSourceSearchEmpty(true);
@@ -175,12 +204,23 @@ export function FindingCard({
       }
 
       onSourceSearchResult(finding.id, result);
-    } catch {
-      setSourceSearchError(EVIDENCE_ERROR_MESSAGE);
+    } catch (error) {
+      console.error("[FindingCard] evidence search failed", error);
+      setSourceSearchError(EVIDENCE_JOB_FAILED_MESSAGE);
     } finally {
-      setSourceSearchLoading(false);
+      if (isDeep) {
+        setDeepSearchLoading(false);
+      } else {
+        setSourceSearchLoading(false);
+      }
+      setSourceSearchStage(null);
     }
   }
+
+  const sourceSearchStatusMessage =
+    sourceSearchStage !== null
+      ? EVIDENCE_STAGE_COPY[sourceSearchStage]
+      : null;
 
   function handleDisputeSubmit() {
     const trimmed = disputeReason.trim();
@@ -196,6 +236,7 @@ export function FindingCard({
         "rounded-lg border bg-card p-4",
         config.border,
         !isOpen && "opacity-70",
+        layout === "carousel" && "flex flex-col",
       )}
     >
       <div className="mb-2.5 flex items-center gap-2">
@@ -241,11 +282,17 @@ export function FindingCard({
         </p>
       )}
 
+      {finding.type === "fallacy" && !fallacyGuideOpen && finding.reason && (
+        <p className="mb-3 text-[12px] leading-relaxed text-muted-foreground">
+          {finding.reason}
+        </p>
+      )}
+
       <blockquote className="mb-3 rounded border-l-2 border-border bg-muted/40 py-1 pl-2.5 pr-1 text-[11px] italic leading-relaxed text-foreground/70">
         &ldquo;{finding.spanText}&rdquo;
       </blockquote>
 
-      {finding.type === "fallacy" && (
+      {finding.type === "fallacy" && fallacyGuideOpen && (
         <div className="mb-3">
           <FallacyGuideContent
             fallacyName={finding.subtitle ?? finding.title}
@@ -255,6 +302,26 @@ export function FindingCard({
             disputed={finding.status === "disputed"}
           />
         </div>
+      )}
+
+      {finding.type === "fallacy" && !fallacyGuideOpen && finding.subtitle && isOpen && (
+        <button
+          type="button"
+          onClick={() => setFallacyGuideOpen(true)}
+          className="mb-3 text-left text-[11px] font-medium text-muted-foreground underline decoration-border underline-offset-2 transition-colors hover:text-foreground"
+        >
+          What is {finding.subtitle}?
+        </button>
+      )}
+
+      {finding.type === "fallacy" && fallacyGuideOpen && isOpen && (
+        <button
+          type="button"
+          onClick={() => setFallacyGuideOpen(false)}
+          className="mb-3 text-left text-[11px] font-medium text-muted-foreground underline decoration-border underline-offset-2 transition-colors hover:text-foreground"
+        >
+          Hide explanation
+        </button>
       )}
 
       {finding.type === "clarity" && hasSuggestedRewrite(finding) && isOpen && (
@@ -268,7 +335,7 @@ export function FindingCard({
         </div>
       )}
 
-      {finding.type === "fallacy" && fallacyExpanded && (
+      {finding.type === "fallacy" && fallacyFixOpen && (
         <>
           {finding.suggestedRewrite && (
             <div className="mb-3 rounded-md border border-border bg-muted/40 px-2.5 py-2">
@@ -307,13 +374,13 @@ export function FindingCard({
             {!hasSourceCandidates && (
               <ActionButton
                 variant="primary"
-                onClick={() => void handleFindSources()}
-                disabled={sourceSearchLoading}
+                onClick={() => void handleFindSources("standard")}
+                disabled={sourceSearchLoading || deepSearchLoading}
               >
                 {sourceSearchLoading ? (
                   <span className="inline-flex items-center gap-1.5">
                     <Loader2 className="h-3 w-3 animate-spin" strokeWidth={2} />
-                    Searching...
+                    {sourceSearchStatusMessage ?? "Searching..."}
                   </span>
                 ) : (
                   "Find sources"
@@ -331,17 +398,15 @@ export function FindingCard({
                 Revise as opinion
               </ActionButton>
             )}
-            <div className="flex w-full flex-col gap-1">
-              <ActionButton variant="muted" onClick={() => onKeepAsIs(finding.id)}>
-                {hasNegativeEvidence ? "Keep as-is anyway" : "Keep as-is"}
-              </ActionButton>
-              {hasNegativeEvidence && (
-                <p className="text-[10px] leading-relaxed text-amber-400/80">
-                  {KEEP_AS_IS_CAVEAT_HINT}
-                </p>
-              )}
-            </div>
+            <ActionButton onClick={() => onKeepAsIs(finding.id)}>
+              {hasNegativeEvidence ? "Keep as-is anyway" : "Keep as-is"}
+            </ActionButton>
           </div>
+          {hasNegativeEvidence && (
+            <p className="mt-2 text-[10px] leading-relaxed text-amber-400/80">
+              {KEEP_AS_IS_CAVEAT_HINT}
+            </p>
+          )}
 
           {revisePanelOpen && !allowOneClickOpinion && (
             <div className="mt-3 rounded-md border border-border bg-muted/40 px-2.5 py-2.5">
@@ -385,9 +450,16 @@ export function FindingCard({
           )}
 
           {sourceSearchError && (
-            <p className="mt-2 text-[11px] text-red-300/90" role="status">
-              {sourceSearchError}
-            </p>
+            <div className="mt-2 space-y-2" role="status">
+              <p className="text-[11px] text-red-300/90">{sourceSearchError}</p>
+              <ActionButton
+                variant="muted"
+                onClick={() => void handleFindSources("standard")}
+                disabled={sourceSearchLoading || deepSearchLoading}
+              >
+                Try again
+              </ActionButton>
+            </div>
           )}
 
           {sourceSearchEmpty && (
@@ -397,14 +469,63 @@ export function FindingCard({
           )}
 
           {hasSourceCandidates && finding.sourceCandidates && (
-            <EvidenceCandidatesList
-              claimVerdict={finding.evidenceClaimVerdict ?? "unclear"}
-              summary={finding.evidenceSummary ?? ""}
-              sources={finding.sourceCandidates}
-              onUseSource={(source) =>
-                onAttachEvidenceSource(finding.id, source)
-              }
-            />
+            <>
+              {finding.evidenceShouldEscalate &&
+                !finding.evidenceInvestigationTrace?.length && (
+                  <div className="mt-3 rounded-md border border-amber-500/25 bg-amber-500/5 px-2.5 py-2">
+                    <p className="text-[11px] leading-relaxed text-amber-200/90">
+                      Parliavent found this claim may need deeper investigation.
+                    </p>
+                    {finding.evidenceEscalationReason && (
+                      <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">
+                        {finding.evidenceEscalationReason}
+                      </p>
+                    )}
+                    {finding.evidenceEscalationSignals &&
+                      finding.evidenceEscalationSignals.length > 0 && (
+                        <ul className="mt-1.5 space-y-0.5">
+                          {finding.evidenceEscalationSignals.slice(0, 4).map((signal) => (
+                            <li
+                              key={signal}
+                              className="text-[10px] text-muted-foreground before:mr-1 before:content-['·']"
+                            >
+                              {signal.replace(/_/g, " ")}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    <div className="mt-2">
+                      <ActionButton
+                        variant="primary"
+                        onClick={() => void handleFindSources("deep")}
+                        disabled={deepSearchLoading || sourceSearchLoading}
+                      >
+                        {deepSearchLoading ? (
+                          <span className="inline-flex items-center gap-1.5">
+                            <Loader2 className="h-3 w-3 animate-spin" strokeWidth={2} />
+                            {sourceSearchStatusMessage ?? "Investigating..."}
+                          </span>
+                        ) : (
+                          "Run deep investigation"
+                        )}
+                      </ActionButton>
+                    </div>
+                  </div>
+                )}
+              <EvidenceCandidatesList
+                claimVerdict={finding.evidenceClaimVerdict ?? "unclear"}
+                summary={finding.evidenceSummary ?? ""}
+                sources={finding.sourceCandidates}
+                evidencePassages={finding.sourceCandidates.flatMap(
+                  (source) => source.evidencePassages ?? [],
+                )}
+                investigationTrace={finding.evidenceInvestigationTrace}
+                evidenceMode={finding.evidenceMode}
+                onUseSource={(source) =>
+                  onAttachEvidenceSource(finding.id, source)
+                }
+              />
+            </>
           )}
         </>
       )}
@@ -412,20 +533,17 @@ export function FindingCard({
       {isOpen && finding.type === "fallacy" && (
         <>
           <div className="flex flex-wrap gap-2">
-            {!fallacyExpanded && (
-              <ActionButton onClick={() => setFallacyExpanded(true)}>
+            {finding.suggestedRewrite && !fallacyFixOpen && (
+              <ActionButton onClick={() => setFallacyFixOpen(true)}>
                 See suggested fix
               </ActionButton>
             )}
-            {fallacyExpanded && finding.suggestedRewrite && (
+            {fallacyFixOpen && finding.suggestedRewrite && (
               <ActionButton variant="primary" onClick={() => onUseSuggestion(finding.id)}>
                 Use this wording
               </ActionButton>
             )}
-            <ActionButton
-              variant={fallacyExpanded ? "default" : "muted"}
-              onClick={() => onKeepAsIs(finding.id)}
-            >
+            <ActionButton onClick={() => onKeepAsIs(finding.id)}>
               Keep as-is
             </ActionButton>
             {!disputeOpen && (

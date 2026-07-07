@@ -2,7 +2,6 @@
 
 import { ArrowLeft, MessageSquare, PenLine } from "lucide-react";
 import type { ComposerContext } from "@/lib/types";
-import { excerptText } from "@/lib/excerptText";
 import { Button } from "@/components/ui/button";
 
 interface ComposerShellProps {
@@ -57,18 +56,10 @@ export function ComposerShell({
               <h1 className="mt-0.5 text-lg font-bold leading-snug text-foreground sm:text-xl">
                 {context.issueTitle}
               </h1>
-              {isResponse && (context.parentPreview || context.parentArgument) && (
-                <div className="mt-3 rounded-lg border border-border bg-background/60 px-3.5 py-3">
-                  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    Replying to
-                  </p>
-                  <p className="line-clamp-3 text-[13px] leading-relaxed text-foreground/80">
-                    &ldquo;
-                    {context.parentPreview ??
-                      excerptText(context.parentArgument ?? "", 160)}
-                    &rdquo;
-                  </p>
-                </div>
+              {isResponse && context.parentAuthor && (
+                <p className="mt-2 text-[12px] text-muted-foreground">
+                  Replying to {context.parentAuthor}
+                </p>
               )}
               <p className="mt-2 text-[12px] text-muted-foreground">
                 Write → review judge findings → post. Your words, your call.

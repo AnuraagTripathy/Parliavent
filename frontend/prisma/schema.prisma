@@ -68,6 +68,16 @@ enum CaveatType {
   unresolved_review
 }
 
+model User {
+  id          String   @id
+  displayName String?
+  email       String?
+  imageUrl    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  posts       Post[]
+}
+
 model Debate {
   id        String     @id @default(cuid())
   motion    String
@@ -84,18 +94,21 @@ model Post {
   parentPostId String?
   text         String
   postType     PostType
+  authorId     String?
   authorName   String
   publishedAt  DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
   debate     Debate    @relation(fields: [debateId], references: [id], onDelete: Cascade)
+  author     User?     @relation(fields: [authorId], references: [id], onDelete: SetNull)
   parentPost Post?     @relation("PostReplies", fields: [parentPostId], references: [id])
   replies    Post[]    @relation("PostReplies")
   findings   Finding[]
   caveats    Caveat[]
 
   @@index([debateId])
+  @@index([authorId])
 }
 
 model Finding {

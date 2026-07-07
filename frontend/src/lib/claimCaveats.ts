@@ -52,7 +52,6 @@ export function shouldShowClaimCaveat(finding: Finding): boolean {
 
 export function buildClaimCaveatsFromFindings(
   findings: Finding[],
-  text: string,
 ): ClaimCaveat[] {
   const caveats: ClaimCaveat[] = [];
 
@@ -63,7 +62,7 @@ export function buildClaimCaveatsFromFindings(
 
     const verdict = finding.evidenceClaimVerdict!;
     const message = claimCaveatMessage(verdict);
-    if (!message || !text.includes(finding.spanText)) {
+    if (!message) {
       continue;
     }
 
@@ -76,10 +75,4 @@ export function buildClaimCaveatsFromFindings(
   }
 
   return caveats;
-}
-
-export function hasOpenNonCaveatedFindings(findings: Finding[]): boolean {
-  return findings.some(
-    (finding) => finding.status === "open" && !shouldShowClaimCaveat(finding),
-  );
 }

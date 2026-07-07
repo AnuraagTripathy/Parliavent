@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { requireAuthUser, unauthorizedResponse } from "@/lib/auth/session";
+import { canViewDbPost } from "@/lib/db/debateVisibility";
 import { prisma } from "@/lib/db";
 import { toPublishedArgument } from "@/lib/db/mappers";
 import { isVisibleDbPost } from "@/lib/db/postVisibility";
@@ -15,10 +17,17 @@ const postInclude = {
 } as const;
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
+
+  let auth;
+  try {
+    auth = await requireAuthUser(request);
+  } catch {
+    return unauthorizedResponse();
+  }
 
   try {
     const debate = await prisma.debate.findFirst({
@@ -37,7 +46,15 @@ export async function GET(
       return NextResponse.json({ error: "Debate not found" }, { status: 404 });
     }
 
-    const visiblePosts = debate.posts.filter(isVisibleDbPost);
+    const visiblePosts = debate.posts.filter(
+      (post) =>
+        isVisibleDbPost(post) && canViewDbPost(post, auth.authorId),
+    );
+
+    if (visiblePosts.length === 0) {
+      return NextResponse.json({ error: "Debate not found" }, { status: 404 });
+    }
+
     const posts = visiblePosts.map((post) => toPublishedArgument(post, debate));
 
     return NextResponse.json({

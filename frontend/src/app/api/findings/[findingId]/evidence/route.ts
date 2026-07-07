@@ -1,11 +1,21 @@
 import { NextResponse } from "next/server";
+import { requireAuthUser, unauthorizedResponse } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
+import { isAttachableUnderVerdict } from "@/lib/evidence/sourceEligibility";
+import { scopedSourceId } from "@/lib/scopedIds";
 import type {
   ClaimKind,
   ClaimVerdict,
   SourceCredibility,
   SupportLevel,
 } from "@/lib/types";
+
+const VALID_CLAIM_KINDS: ClaimKind[] = [
+  "factual",
+  "opinion",
+  "mixed",
+  "unclear",
+];
 
 const VALID_VERDICTS: ClaimVerdict[] = [
   "supported",
@@ -45,6 +55,13 @@ export async function POST(
 ) {
   const { findingId } = await params;
 
+  let auth;
+  try {
+    auth = await requireAuthUser(request);
+  } catch {
+    return unauthorizedResponse();
+  }
+
   let body: unknown;
   try {
     body = await request.json();
@@ -74,6 +91,15 @@ export async function POST(
     return NextResponse.json({ error: "summary is required" }, { status: 400 });
   }
 
+  if (
+    claimKind !== undefined &&
+    claimKind !== null &&
+    (typeof claimKind !== "string" ||
+      !VALID_CLAIM_KINDS.includes(claimKind as ClaimKind))
+  ) {
+    return NextResponse.json({ error: "Invalid claimKind" }, { status: 400 });
+  }
+
   if (!Array.isArray(sources)) {
     return NextResponse.json({ error: "sources must be an array" }, { status: 400 });
   }
@@ -93,33 +119,45 @@ export async function POST(
       typeof s.supportLevel !== "string" ||
       !VALID_SUPPORT.includes(s.supportLevel as SupportLevel) ||
       typeof s.credibility !== "string" ||
-      !VALID_CREDIBILITY.includes(s.credibility as SourceCredibility) ||
-      typeof s.canAttachAsSupport !== "boolean"
+      !VALID_CREDIBILITY.includes(s.credibility as SourceCredibility)
     ) {
       return NextResponse.json({ error: "Invalid source entry" }, { status: 400 });
     }
 
+    // Attachability is recomputed server-side from supportLevel + verdict;
+    // client-submitted canAttachAsSupport/isAttached booleans are not trusted.
+    const supportLevel = s.supportLevel as SupportLevel;
+    const attachable = isAttachableUnderVerdict(
+      supportLevel,
+      claimVerdict as ClaimVerdict,
+    );
+
     parsedSources.push({
-      id: s.id,
+      id: scopedSourceId(findingId, s.id),
       title: s.title,
       publisher: s.publisher,
       url: s.url,
       snippet: s.snippet,
-      supportLevel: s.supportLevel as SupportLevel,
+      supportLevel,
       credibility: s.credibility as SourceCredibility,
       rationale: typeof s.rationale === "string" ? s.rationale : undefined,
-      canAttachAsSupport: s.canAttachAsSupport,
-      isAttached: s.isAttached === true,
+      canAttachAsSupport: attachable,
+      isAttached: s.isAttached === true && attachable,
     });
   }
 
   try {
     const finding = await prisma.finding.findUnique({
       where: { id: findingId },
+      include: { post: { select: { authorId: true } } },
     });
 
     if (!finding) {
       return NextResponse.json({ error: "Finding not found" }, { status: 404 });
+    }
+
+    if (finding.post.authorId !== auth.authorId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     await prisma.$transaction(async (tx) => {

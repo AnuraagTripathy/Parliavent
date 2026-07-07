@@ -1,26 +1,22 @@
 import { NextResponse } from "next/server";
+import { requireAuthUser, unauthorizedResponse } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
+import { isValidFindingInput } from "@/lib/db/findingInput";
 import { findingToCreateInput } from "@/lib/db/mappers";
-import type { Finding } from "@/lib/types";
-
-function isFinding(value: unknown): value is Finding {
-  if (!value || typeof value !== "object") return false;
-  const f = value as Record<string, unknown>;
-  return (
-    typeof f.id === "string" &&
-    typeof f.type === "string" &&
-    typeof f.status === "string" &&
-    typeof f.spanText === "string" &&
-    typeof f.title === "string" &&
-    typeof f.reason === "string"
-  );
-}
+import { scopedFindingId } from "@/lib/scopedIds";
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ postId: string }> },
 ) {
   const { postId } = await params;
+
+  let auth;
+  try {
+    auth = await requireAuthUser(request);
+  } catch {
+    return unauthorizedResponse();
+  }
 
   let body: unknown;
   try {
@@ -35,7 +31,7 @@ export async function POST(
 
   const { findings } = body as { findings?: unknown };
 
-  if (!Array.isArray(findings) || !findings.every(isFinding)) {
+  if (!Array.isArray(findings) || !findings.every(isValidFindingInput)) {
     return NextResponse.json(
       { error: "findings must be an array of valid findings" },
       { status: 400 },
@@ -48,8 +44,12 @@ export async function POST(
       return NextResponse.json({ error: "Post not found" }, { status: 404 });
     }
 
+    if (post.authorId !== auth.authorId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     await prisma.$transaction(async (tx) => {
-      const incomingIds = findings.map((f) => f.id);
+      const incomingIds = findings.map((f) => scopedFindingId(postId, f.id));
 
       await tx.finding.deleteMany({
         where: {
@@ -59,9 +59,12 @@ export async function POST(
       });
 
       for (const finding of findings) {
-        const data = findingToCreateInput(finding);
+        const data = {
+          ...findingToCreateInput(finding),
+          id: scopedFindingId(postId, finding.id),
+        };
         await tx.finding.upsert({
-          where: { id: finding.id },
+          where: { id: data.id },
           create: {
             ...data,
             postId,

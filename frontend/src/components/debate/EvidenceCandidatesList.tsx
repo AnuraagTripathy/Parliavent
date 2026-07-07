@@ -6,18 +6,25 @@ import {
   EVIDENCE_UNSUPPORTED_WARNING,
 } from "@/lib/api/evidence";
 import { sortEvidenceSources } from "@/lib/evidence/sortEvidenceSources";
+import { cleanEvidenceText } from "@/lib/evidence/cleanEvidenceText";
 import type {
+  AgentTraceStep,
   ClaimVerdict,
+  EvidenceResultMode,
   EvidenceSource,
   SourceCredibility,
   SupportLevel,
 } from "@/lib/types";
+import { InvestigationTrace } from "./InvestigationTrace";
 import { Button } from "@/components/ui/button";
 
 interface EvidenceCandidatesListProps {
   claimVerdict: ClaimVerdict;
   summary: string;
   sources: EvidenceSource[];
+  evidencePassages?: string[];
+  investigationTrace?: AgentTraceStep[];
+  evidenceMode?: EvidenceResultMode;
   onUseSource: (source: EvidenceSource) => void;
 }
 
@@ -152,7 +159,7 @@ function SourceRow({
       >
         <div className="flex items-start gap-1.5">
           <p className="min-w-0 flex-1 text-[11px] font-medium leading-snug text-foreground/90">
-            {source.title}
+            {cleanEvidenceText(source.title)}
           </p>
           <ChevronDown
             className={`mt-0.5 h-3 w-3 shrink-0 text-muted-foreground transition-transform ${
@@ -174,7 +181,7 @@ function SourceRow({
 
         {!expanded && source.snippet && (
           <p className="mt-1 line-clamp-1 text-[10px] leading-relaxed text-muted-foreground">
-            {source.snippet}
+            {cleanEvidenceText(source.snippet)}
           </p>
         )}
       </button>
@@ -182,8 +189,8 @@ function SourceRow({
       {expanded && (
         <div className="px-2.5 pt-1.5">
           {source.snippet && (
-            <p className="mb-1.5 text-[10px] leading-relaxed text-muted-foreground">
-              {source.snippet}
+            <p className="mb-1.5 whitespace-pre-line text-[10px] leading-relaxed text-muted-foreground">
+              {cleanEvidenceText(source.snippet)}
             </p>
           )}
           {source.rationale && (
@@ -214,6 +221,9 @@ export function EvidenceCandidatesList({
   claimVerdict,
   summary,
   sources,
+  evidencePassages,
+  investigationTrace,
+  evidenceMode,
   onUseSource,
 }: EvidenceCandidatesListProps) {
   const [showAll, setShowAll] = useState(false);
@@ -243,6 +253,12 @@ export function EvidenceCandidatesList({
         <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
           Evidence review
         </p>
+        {evidenceMode === "deep" && (
+          <MiniBadge className={CAVEAT_BADGE}>Deep investigation</MiniBadge>
+        )}
+        {evidenceMode === "auto_escalated" && (
+          <MiniBadge className={CAVEAT_BADGE}>Auto-escalated</MiniBadge>
+        )}
         <MiniBadge className={verdictStyles[claimVerdict]}>
           {verdictLabels[claimVerdict]}
         </MiniBadge>
@@ -283,6 +299,28 @@ export function EvidenceCandidatesList({
         <p className="mb-2 rounded-md border border-red-500/20 bg-red-500/5 px-2 py-1.5 text-[10px] leading-relaxed text-red-300/90">
           {EVIDENCE_UNSUPPORTED_WARNING}
         </p>
+      )}
+
+      {evidencePassages && evidencePassages.length > 0 && (
+        <div className="mb-2 rounded-md border border-border/70 bg-muted/30 px-2 py-1.5">
+          <p className="mb-1 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+            Key evidence passages
+          </p>
+          <ul className="space-y-1">
+            {evidencePassages.slice(0, 3).map((passage, index) => (
+              <li
+                key={index}
+                className="text-[10px] leading-relaxed text-foreground/80 before:mr-1 before:text-muted-foreground/60 before:content-['·']"
+              >
+                {cleanEvidenceText(passage)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {investigationTrace && investigationTrace.length > 0 && (
+        <InvestigationTrace trace={investigationTrace} />
       )}
 
       <ul className="space-y-1.5">

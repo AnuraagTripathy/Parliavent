@@ -1,5 +1,15 @@
 import { NextResponse } from "next/server";
+import { getOptionalAuthUser, unauthorizedResponse } from "@/lib/auth/session";
+
+// Vercel: allow time for the Groq call plus its capped 429-retry budget.
+export const maxDuration = 60;
+
 import { analyzeArgument } from "@/lib/judge/analyzeArgument";
+import {
+  checkRateLimit,
+  JUDGE_RATE_LIMIT,
+  rateLimitResponse,
+} from "@/lib/rateLimit";
 import type {
   JudgeMode,
   JudgePostType,
@@ -27,6 +37,22 @@ function isOptionalString(value: unknown): value is string | undefined {
 }
 
 export async function POST(request: Request) {
+  // getOptionalAuthUser (not requireAuthUser) on purpose: this route fires on
+  // every typing pause and must not upsert the User row on each call.
+  const user = await getOptionalAuthUser(request);
+  if (!user) {
+    return unauthorizedResponse();
+  }
+
+  const rate = checkRateLimit(
+    `judge:${user.id}`,
+    JUDGE_RATE_LIMIT.limit,
+    JUDGE_RATE_LIMIT.windowMs,
+  );
+  if (!rate.allowed) {
+    return rateLimitResponse(rate.retryAfterSeconds);
+  }
+
   let body: unknown;
 
   try {

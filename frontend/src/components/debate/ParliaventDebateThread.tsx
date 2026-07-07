@@ -1,15 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { MessageSquare, Reply, ShieldCheck } from "lucide-react";
+import { Reply } from "lucide-react";
 import type { CommentType } from "@/components/ui/reddit-nested-thread-reply";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { ContestedChip } from "./ContestedChip";
+import type { PostReviewMeta } from "@/lib/buildPostReviewMeta";
 import { DeskBangButton } from "./DeskBangButton";
+import { PostBodyWithSources } from "./PostCitations";
+import { PostReviewPanel } from "./PostReviewPanel";
 import { StaggerGroup, StaggerItem } from "@/components/ui/fade-in";
 
 export interface DebateCommentMeta {
@@ -17,14 +19,13 @@ export interface DebateCommentMeta {
   userBanged: boolean;
   isStarter?: boolean;
   sourceCount?: number;
-  contestedFallacies?: string[];
+  review?: PostReviewMeta;
 }
 
 interface DebateCommentProps {
   comment: CommentType;
   meta: DebateCommentMeta;
   depth?: number;
-  onOpenPost: (id: string) => void;
   onReply?: (id: string) => void;
   onDeskBang: (id: string) => void;
   getMeta: (id: string | number) => DebateCommentMeta | undefined;
@@ -42,7 +43,6 @@ function DebateComment({
   comment,
   meta,
   depth = 0,
-  onOpenPost,
   onReply,
   onDeskBang,
   getMeta,
@@ -87,35 +87,25 @@ function DebateComment({
                     Starter
                   </Badge>
                 )}
-                {(meta.sourceCount ?? 0) > 0 && (
-                  <span className="inline-flex items-center gap-1 text-[11px] text-primary/80">
-                    <ShieldCheck className="h-3 w-3" />
-                    {meta.sourceCount} sourced
-                  </span>
-                )}
               </div>
 
-              <button
-                type="button"
-                onClick={() => onOpenPost(String(comment.id))}
-                className="w-full text-left"
-              >
-                <p
-                  className={cn(
-                    "mb-3 leading-relaxed text-foreground/85 hover:text-foreground",
-                    depth === 0 ? "text-[15px]" : "text-sm",
-                  )}
-                >
-                  {comment.content}
-                </p>
-              </button>
+              <PostBodyWithSources
+                text={comment.content}
+                sources={meta.review?.sources ?? []}
+                citations={meta.review?.citations ?? []}
+                claimCaveats={meta.review?.claimCaveats ?? []}
+                compact={depth > 0}
+                className={meta.review?.hasReview ? "mb-2" : "mb-3"}
+                postId={String(comment.id)}
+              />
 
-              {(meta.contestedFallacies?.length ?? 0) > 0 && (
-                <div className="mb-2 flex flex-wrap gap-1.5">
-                  {meta.contestedFallacies!.map((f) => (
-                    <ContestedChip key={f} fallacyName={f} compact />
-                  ))}
-                </div>
+              {meta.review?.hasReview && (
+                <PostReviewPanel
+                  review={meta.review}
+                  compact
+                  hideSources
+                  className="mb-2"
+                />
               )}
 
               <div className="flex flex-wrap items-center gap-1">
@@ -137,15 +127,6 @@ function DebateComment({
                     Reply
                   </Button>
                 )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2 text-xs"
-                  onClick={() => onOpenPost(String(comment.id))}
-                >
-                  <MessageSquare className="mr-1 h-3 w-3" />
-                  Read full
-                </Button>
                 {replyCount > 0 && (
                   <Button
                     variant="ghost"
@@ -174,7 +155,6 @@ function DebateComment({
               comment={reply}
               meta={childMeta}
               depth={depth + 1}
-              onOpenPost={onOpenPost}
               onReply={onReply}
               onDeskBang={onDeskBang}
               getMeta={getMeta}
@@ -188,7 +168,6 @@ function DebateComment({
 interface ParliaventDebateThreadProps {
   comments: CommentType[];
   getMeta: (id: string | number) => DebateCommentMeta | undefined;
-  onOpenPost: (id: string) => void;
   onReply?: (id: string) => void;
   onDeskBang: (id: string) => void;
   initialDepth?: number;
@@ -197,7 +176,6 @@ interface ParliaventDebateThreadProps {
 export function ParliaventDebateThread({
   comments,
   getMeta,
-  onOpenPost,
   onReply,
   onDeskBang,
   initialDepth = 0,
@@ -205,7 +183,6 @@ export function ParliaventDebateThread({
   if (comments.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-border bg-card/50 py-16 text-center text-muted-foreground">
-        <MessageSquare className="mx-auto mb-3 h-10 w-10 opacity-40" />
         <p>No starters yet. Be the first to open the debate.</p>
       </div>
     );
@@ -222,7 +199,6 @@ export function ParliaventDebateThread({
               comment={comment}
               meta={meta}
               depth={initialDepth}
-              onOpenPost={onOpenPost}
               onReply={onReply}
               onDeskBang={onDeskBang}
               getMeta={getMeta}

@@ -225,3 +225,7 @@ export function getAllFallacyGuides(): FallacyGuideEntry[] {
 
   return entries.sort((a, b) => a.name.localeCompare(b.name));
 }
+
+export function fallacyGuideSlug(name: string): string {
+  return normalizeFallacyKey(name).replace(/\s+/g, "-");
+}

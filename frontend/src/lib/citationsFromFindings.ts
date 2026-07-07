@@ -5,11 +5,17 @@ export function citationsFromFindings(findings: Finding[]): Citation[] {
     .filter(
       (f) => f.status === "source_attached" && f.selectedSourceId !== undefined,
     )
-    .map((f) => ({
-      id: f.id,
-      spanText: f.spanText,
-      sourceId: f.selectedSourceId!,
-    }));
+    .map((f) => {
+      const candidate = f.sourceCandidates?.find(
+        (s) => s.id === f.selectedSourceId,
+      );
+      return {
+        id: f.id,
+        spanText: f.spanText,
+        sourceId: f.selectedSourceId!,
+        supportLevel: candidate?.supportLevel,
+      };
+    });
 }
 
 export function sourcesFromFindings(findings: Finding[]): Source[] {

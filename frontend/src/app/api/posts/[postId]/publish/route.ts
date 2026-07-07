@@ -1,14 +1,16 @@
 import { NextResponse } from "next/server";
+import { requireAuthUser, unauthorizedResponse } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
+import { isValidFindingInput } from "@/lib/db/findingInput";
 import {
   findingToCreateInput,
   toPublishedArgument,
 } from "@/lib/db/mappers";
+import { scopedFindingId } from "@/lib/scopedIds";
 import {
   buildClaimCaveatsFromFindings,
-  hasOpenNonCaveatedFindings,
 } from "@/lib/claimCaveats";
-import type { Finding } from "@/lib/types";
+import { hasOpenNonCaveatedFindings } from "@/lib/publishedReviewFindings";
 
 const postInclude = {
   findings: {
@@ -21,24 +23,18 @@ const postInclude = {
   caveats: true,
 } as const;
 
-function isFinding(value: unknown): value is Finding {
-  if (!value || typeof value !== "object") return false;
-  const f = value as Record<string, unknown>;
-  return (
-    typeof f.id === "string" &&
-    typeof f.type === "string" &&
-    typeof f.status === "string" &&
-    typeof f.spanText === "string" &&
-    typeof f.title === "string" &&
-    typeof f.reason === "string"
-  );
-}
-
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ postId: string }> },
 ) {
   const { postId } = await params;
+
+  let auth;
+  try {
+    auth = await requireAuthUser(request);
+  } catch {
+    return unauthorizedResponse();
+  }
 
   let body: unknown;
   try {
@@ -51,23 +47,28 @@ export async function POST(
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { text, findings, authorName } = body as Record<string, unknown>;
+  const { text, findings } = body as Record<string, unknown>;
 
   if (typeof text !== "string") {
     return NextResponse.json({ error: "text is required" }, { status: 400 });
   }
 
-  if (!Array.isArray(findings) || !findings.every(isFinding)) {
+  if (!Array.isArray(findings) || !findings.every(isValidFindingInput)) {
     return NextResponse.json(
       { error: "findings must be an array of valid findings" },
       { status: 400 },
     );
   }
 
-  const author =
-    typeof authorName === "string" && authorName.trim()
-      ? authorName.trim()
-      : "Guest";
+  const author = auth.authorName;
+  const trimmedText = text.trim();
+
+  // Findings must anchor to the text being published. Stale findings whose
+  // span no longer exists (user edited right before posting) are dropped
+  // rather than rejected — same behavior as the client-side judge merge.
+  const validFindings = findings.filter((f) =>
+    trimmedText.includes(f.spanText),
+  );
 
   try {
     const existingPost = await prisma.post.findUnique({
@@ -79,8 +80,14 @@ export async function POST(
       return NextResponse.json({ error: "Post not found" }, { status: 404 });
     }
 
+    if (existingPost.authorId !== auth.authorId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     await prisma.$transaction(async (tx) => {
-      const incomingIds = findings.map((f) => f.id);
+      const incomingIds = validFindings.map((f) =>
+        scopedFindingId(postId, f.id),
+      );
 
       await tx.finding.deleteMany({
         where: {
@@ -89,10 +96,13 @@ export async function POST(
         },
       });
 
-      for (const finding of findings) {
-        const data = findingToCreateInput(finding);
+      for (const finding of validFindings) {
+        const data = {
+          ...findingToCreateInput(finding),
+          id: scopedFindingId(postId, finding.id),
+        };
         await tx.finding.upsert({
-          where: { id: finding.id },
+          where: { id: data.id },
           create: { ...data, postId },
           update: data,
         });
@@ -101,7 +111,8 @@ export async function POST(
       await tx.post.update({
         where: { id: postId },
         data: {
-          text: text.trim(),
+          text: trimmedText,
+          authorId: auth.authorId,
           authorName: author,
           publishedAt: new Date(),
         },
@@ -109,19 +120,19 @@ export async function POST(
 
       await tx.caveat.deleteMany({ where: { postId } });
 
-      const claimCaveats = buildClaimCaveatsFromFindings(findings, text);
+      const claimCaveats = buildClaimCaveatsFromFindings(validFindings);
       for (const caveat of claimCaveats) {
         await tx.caveat.create({
           data: {
             postId,
-            findingId: caveat.id,
+            findingId: scopedFindingId(postId, caveat.id),
             type: "claim_verdict",
             message: caveat.message,
           },
         });
       }
 
-      if (hasOpenNonCaveatedFindings(findings)) {
+      if (hasOpenNonCaveatedFindings(validFindings)) {
         await tx.caveat.create({
           data: {
             postId,

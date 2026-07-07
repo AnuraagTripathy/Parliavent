@@ -5,6 +5,9 @@ import type { EvidenceSearchResponse } from "@/lib/types";
 /** Successful evidence searches expire after 30 minutes. */
 export const EVIDENCE_CACHE_TTL_MS = 30 * 60 * 1000;
 
+/** Hard cap so a burst of unique claims can't grow memory unboundedly. */
+export const EVIDENCE_CACHE_MAX_ENTRIES = 500;
+
 interface CacheEntry {
   response: EvidenceSearchResponse;
   expiresAt: number;
@@ -67,6 +70,13 @@ export function setEvidenceCache(
   response: EvidenceSearchResponse,
 ): void {
   pruneExpiredEntries();
+
+  // Evict oldest entries (Map iteration order is insertion order) past the cap.
+  while (cache.size >= EVIDENCE_CACHE_MAX_ENTRIES) {
+    const oldestKey = cache.keys().next().value;
+    if (oldestKey === undefined) break;
+    cache.delete(oldestKey);
+  }
 
   const key = buildEvidenceCacheKey(claim, threadId);
   cache.set(key, {

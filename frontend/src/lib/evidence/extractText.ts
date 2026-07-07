@@ -1,3 +1,5 @@
+import { cleanEvidenceText } from "@/lib/evidence/cleanEvidenceText";
+
 /** Maximum extracted characters kept per page before passage ranking. */
 export const MAX_EXTRACTED_TEXT_LENGTH = 12_000;
 
@@ -56,7 +58,7 @@ export function extractTextFromHtml(html: string): string {
     .filter(Boolean)
     .join("\n\n");
 
-  text = collapseWhitespace(text.replace(/\n{3,}/g, "\n\n"));
+  text = cleanEvidenceText(text.replace(/\n{3,}/g, "\n\n"));
 
   if (text.length > MAX_EXTRACTED_TEXT_LENGTH) {
     return `${text.slice(0, MAX_EXTRACTED_TEXT_LENGTH).trim()}…`;

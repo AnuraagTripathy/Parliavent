@@ -4,7 +4,7 @@ import { ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { useState, Suspense, lazy } from "react";
 import { Button } from "@/components/ui/button";
-import { staggerContainer, staggerItem, transitionMedium } from "@/lib/motion";
+import { staggerContainer, staggerItem } from "@/lib/motion";
 
 const Dithering = lazy(() =>
   import("@paper-design/shaders-react").then((mod) => ({
@@ -14,9 +14,10 @@ const Dithering = lazy(() =>
 
 interface CTASectionProps {
   onStart?: () => void;
+  ctaLabel?: string;
 }
 
-export function CTASection({ onStart }: CTASectionProps) {
+export function CTASection({ onStart, ctaLabel = "Explore live debates" }: CTASectionProps) {
   const [isHovered, setIsHovered] = useState(false);
 
   return (
@@ -90,7 +91,7 @@ export function CTASection({ onStart }: CTASectionProps) {
                 onClick={onStart}
                 className="group relative inline-flex h-14 items-center justify-center gap-3 overflow-hidden rounded-full bg-primary px-12 text-base font-medium text-primary-foreground transition-all duration-300 hover:scale-[1.03] hover:bg-primary/90 hover:ring-4 hover:ring-primary/20 active:scale-[0.98]"
               >
-                <span className="relative z-10">Explore live debates</span>
+                <span className="relative z-10">{ctaLabel}</span>
                 <ArrowRight className="relative z-10 h-5 w-5 transition-transform duration-300 group-hover:translate-x-1" />
               </Button>
             </motion.div>

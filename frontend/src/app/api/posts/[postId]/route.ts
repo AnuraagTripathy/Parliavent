@@ -1,18 +1,32 @@
 import { NextResponse } from "next/server";
+import { requireAuthUser, unauthorizedResponse } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 
 /** Delete an unpublished draft post (e.g. user cancelled composer). */
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ postId: string }> },
 ) {
   const { postId } = await params;
+
+  let auth;
+  try {
+    auth = await requireAuthUser(request);
+  } catch {
+    return unauthorizedResponse();
+  }
 
   try {
     const post = await prisma.post.findUnique({ where: { id: postId } });
 
     if (!post) {
       return NextResponse.json({ error: "Post not found" }, { status: 404 });
+    }
+
+    // Strict ownership: posts with a null authorId (legacy/seeded rows) are
+    // immutable rather than deletable by anyone.
+    if (post.authorId !== auth.authorId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     if (post.publishedAt) {

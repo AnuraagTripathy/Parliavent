@@ -1,4 +1,5 @@
 import { finalizeEvidenceSource } from "@/lib/evidence/sourceEligibility";
+import { cleanEvidenceText } from "@/lib/evidence/cleanEvidenceText";
 import type { EvidenceSource, SourceCredibility, SupportLevel } from "@/lib/types";
 
 const STOP_WORDS = new Set([
@@ -245,10 +246,10 @@ export function mapTavilyResultsToSources(
   return results.slice(0, 5).map((result, index) =>
     finalizeEvidenceSource({
       id: sourceIdFromUrl(result.url, index),
-      title: result.title.trim() || "Untitled source",
+      title: cleanEvidenceText(result.title.trim()) || "Untitled source",
       publisher: extractPublisher(result.url),
       url: result.url,
-      snippet: result.content.trim(),
+      snippet: cleanEvidenceText(result.content.trim()),
       supportLevel: "unclear" as SupportLevel,
       credibility: assessCredibility(result.url),
     }),

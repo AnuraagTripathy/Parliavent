@@ -7,10 +7,10 @@ import type {
   Source,
 } from "@prisma/client";
 import {
-  buildClaimCaveatsFromFindings,
+  buildPublishedReviewFromFindings,
   hasOpenNonCaveatedFindings,
-} from "@/lib/claimCaveats";
-import { citationsFromFindings, sourcesFromFindings } from "@/lib/citationsFromFindings";
+} from "@/lib/publishedReviewFindings";
+import { buildDebateFeedStats } from "@/lib/buildPostReviewMeta";
 import type {
   ClaimCaveat,
   ClaimKind,
@@ -22,6 +22,7 @@ import type {
   JudgeMode,
   PostKind,
   PublishedArgument,
+  PublishedReviewFinding,
   SavedDebateSummary,
   Source as AppSource,
   SourceCredibility,
@@ -114,9 +115,19 @@ export function toPublishedArgument(
   debate: { id: string; slug: string; motion?: string; mode?: string },
 ): PublishedArgument {
   const findings = post.findings.map((f) => toAppFinding(f));
-  const sources = sourcesFromFindings(findings);
-  const citations = citationsFromFindings(findings);
-  const claimCaveats = buildClaimCaveatsFromFindings(findings, post.text);
+  const review = buildPublishedReviewFromFindings(findings);
+  const publishedFindings: PublishedReviewFinding[] = findings.map((f) => ({
+    id: f.id,
+    type: f.type,
+    status: f.status,
+    spanText: f.spanText,
+    title: f.title,
+    reason: f.reason,
+    subtitle: f.subtitle,
+    evidenceClaimVerdict: f.evidenceClaimVerdict,
+    selectedSourceId: f.selectedSourceId,
+    sources: f.sources,
+  }));
 
   const dbClaimCaveats: ClaimCaveat[] = post.caveats
     .filter((c) => c.type === "claim_verdict" && c.findingId)
@@ -132,12 +143,11 @@ export function toPublishedArgument(
     .filter((c) => c.spanText);
 
   const mergedClaimCaveats =
-    claimCaveats.length > 0 ? claimCaveats : dbClaimCaveats.length > 0 ? dbClaimCaveats : undefined;
-
-  const contestedFallacies = findings
-    .filter((f) => f.type === "fallacy" && f.status === "disputed")
-    .map((f) => f.subtitle)
-    .filter((name): name is string => Boolean(name));
+    review.claimCaveats.length > 0
+      ? review.claimCaveats
+      : dbClaimCaveats.length > 0
+        ? dbClaimCaveats
+        : undefined;
 
   const unresolvedCaveat = post.caveats.find(
     (c) => c.type === "unresolved_review",
@@ -152,16 +162,25 @@ export function toPublishedArgument(
       ? post.publishedAt.toLocaleString()
       : post.createdAt.toLocaleString(),
     text: post.text,
-    sources,
-    citations,
+    publishedFindings,
+    sources: review.sources,
+    citations: review.citations,
     claimCaveats: mergedClaimCaveats,
+    needsEvidence:
+      review.needsEvidence.length > 0 ? review.needsEvidence : undefined,
+    reviewFallacies:
+      review.reviewFallacies.length > 0 ? review.reviewFallacies : undefined,
+    reviewClarity:
+      review.reviewClarity.length > 0 ? review.reviewClarity : undefined,
     kind: post.postType === "starter" ? "starter" : "response",
     issueId: debate.slug,
     parentId: post.parentPostId ?? undefined,
     deskBangs: 0,
     userBanged: false,
     contestedFallacies:
-      contestedFallacies.length > 0 ? contestedFallacies : undefined,
+      review.contestedFallacies.length > 0
+        ? review.contestedFallacies
+        : undefined,
     caveats:
       unresolvedCaveat || hasOtherOpenFindings
         ? [unresolvedCaveat?.message ?? "Posted with unresolved review item."]
@@ -197,7 +216,11 @@ export function toSavedDebateSummary(
       parentPostId: string | null;
       authorName: string;
       publishedAt: Date | null;
-      _count: { findings: number; caveats: number };
+      findings: (Finding & {
+        evidenceResult: EvidenceResult | null;
+        findingSources: (FindingSource & { source: Source })[];
+      })[];
+      caveats: Array<Pick<Caveat, "type" | "findingId" | "message">>;
     }>;
   },
 ): SavedDebateSummary {
@@ -206,12 +229,46 @@ export function toSavedDebateSummary(
       (p) => p.postType === "starter" && p.parentPostId === null,
     ) ?? debate.posts.find((p) => p.postType === "starter");
 
-  let findingCount = 0;
-  let caveatCount = 0;
+  const feedPosts: Parameters<typeof buildDebateFeedStats>[0] = [];
+
   for (const post of debate.posts) {
-    findingCount += post._count.findings;
-    caveatCount += post._count.caveats;
+    const findings = post.findings.map((f) => toAppFinding(f));
+    const publishedFindings = findings.map((f) => ({
+      id: f.id,
+      type: f.type,
+      status: f.status,
+      spanText: f.spanText,
+      title: f.title,
+      reason: f.reason,
+      subtitle: f.subtitle,
+      evidenceClaimVerdict: f.evidenceClaimVerdict,
+      selectedSourceId: f.selectedSourceId,
+      sources: f.sources,
+    }));
+    const review = buildPublishedReviewFromFindings(findings);
+    const contestedFallacies = findings
+      .filter((f) => f.type === "fallacy" && f.status === "disputed")
+      .map((f) => f.subtitle)
+      .filter((name): name is string => Boolean(name));
+    const unresolvedCaveat = post.caveats.find(
+      (c) => c.type === "unresolved_review",
+    );
+
+    feedPosts.push({
+      text: post.text,
+      publishedFindings,
+      sources: review.sources,
+      citations: review.citations,
+      claimCaveats: review.claimCaveats,
+      needsEvidence: review.needsEvidence,
+      reviewFallacies: review.reviewFallacies,
+      reviewClarity: review.reviewClarity,
+      contestedFallacies,
+      caveats: unresolvedCaveat ? [unresolvedCaveat.message] : undefined,
+    });
   }
+
+  const feedStats = buildDebateFeedStats(feedPosts);
 
   return {
     id: debate.id,
@@ -229,8 +286,16 @@ export function toSavedDebateSummary(
         }
       : null,
     postCount: debate.posts.length,
-    findingCount,
-    caveatCount,
+    findingCount: feedStats.reviewNoteCount,
+    reviewNoteCount: feedStats.reviewNoteCount,
+    caveatCount: feedStats.caveatCount,
+    sourcedClaimCount: feedStats.sourcedClaimCount,
+    contestedCount: feedStats.contestedCount,
+    needsEvidenceCount: feedStats.needsEvidenceCount,
+    hasCaveats: feedStats.hasCaveats,
+    hasSourced: feedStats.hasSourced,
+    hasContested: feedStats.hasContested,
+    hasNeedsEvidence: feedStats.hasNeedsEvidence,
   };
 }
 
@@ -252,10 +317,6 @@ export function findingToCreateInput(finding: AppFinding) {
     claimKind: finding.claimKind ?? null,
     disputeReason: finding.disputeReason ?? null,
   };
-}
-
-export function debateModeFromJudgeMode(mode: JudgeMode) {
-  return mode;
 }
 
 export function postTypeFromKind(kind: PostKind | undefined) {

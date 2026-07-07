@@ -4,6 +4,9 @@ import type { Finding, JudgeMode, JudgePostType } from "@/lib/types";
 /** Successful Groq judge responses expire after 20 minutes. */
 export const JUDGE_CACHE_TTL_MS = 20 * 60 * 1000;
 
+/** Hard cap so a burst of unique texts can't grow memory unboundedly. */
+export const JUDGE_CACHE_MAX_ENTRIES = 500;
+
 interface CacheEntry {
   findings: Finding[];
   expiresAt: number;
@@ -68,6 +71,13 @@ export function setJudgeCache(
   findings: Finding[],
 ): void {
   pruneExpiredEntries();
+
+  // Evict oldest entries (Map iteration order is insertion order) past the cap.
+  while (cache.size >= JUDGE_CACHE_MAX_ENTRIES) {
+    const oldestKey = cache.keys().next().value;
+    if (oldestKey === undefined) break;
+    cache.delete(oldestKey);
+  }
 
   const key = buildJudgeCacheKey(params);
   cache.set(key, {

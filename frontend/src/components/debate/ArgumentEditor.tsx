@@ -1,6 +1,5 @@
 import type { Citation, Finding, FindingType, Source } from "@/lib/types";
 import { buildSourceIndex } from "@/lib/highlightCitations";
-import { highlightText } from "@/lib/highlightText";
 
 interface ArgumentEditorProps {
   text: string;
@@ -41,7 +40,13 @@ function buildDisplaySegments(
   }[] = [];
 
   for (const finding of findings.filter((f) => f.status === "open")) {
-    const start = text.indexOf(finding.spanText);
+    // Prefer the judge-anchored offset (disambiguates repeated phrases);
+    // fall back to first occurrence when the offset is stale.
+    const start =
+      finding.spanStart !== undefined &&
+      text.startsWith(finding.spanText, finding.spanStart)
+        ? finding.spanStart
+        : text.indexOf(finding.spanText);
     if (start === -1) continue;
     const end = start + finding.spanText.length;
     breakpoints.add(start);
@@ -188,7 +193,7 @@ export function ArgumentEditor({
           value={text}
           onChange={(e) => onChange(e.target.value)}
           spellCheck
-          className="relative min-h-[380px] w-full resize-none rounded-2xl bg-transparent px-6 py-7 text-[19px] leading-[1.75] tracking-[-0.01em] text-transparent caret-primary outline-none selection:bg-primary/15 sm:min-h-[440px] sm:px-8 sm:py-8 sm:text-[20px]"
+          className="relative min-h-[280px] w-full resize-none rounded-2xl bg-transparent px-6 py-7 text-[19px] leading-[1.75] tracking-[-0.01em] text-transparent caret-primary outline-none selection:bg-primary/15 sm:min-h-[320px] sm:px-8 sm:py-8 sm:text-[20px]"
         />
       </div>
     </div>

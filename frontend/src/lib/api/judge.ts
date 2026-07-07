@@ -35,18 +35,35 @@ const PRESERVED_STATUSES = new Set<Finding["status"]>([
   "marked_opinion",
 ]);
 
+function spanKey(finding: Finding): string {
+  return `${finding.type}\0${finding.spanText}`;
+}
+
 export function mergeFindings(
   previous: Finding[],
   incoming: Finding[],
   text: string,
 ): Finding[] {
+  // LLM-generated ids ("finding-claim-1") are positional and shift when the
+  // user edits earlier text, so identity is primarily (type, spanText); the
+  // id is only a fallback. The claimed set stops one previous finding from
+  // donating its resolution state to two incoming findings.
   const previousById = new Map(previous.map((finding) => [finding.id, finding]));
+  const previousBySpan = new Map(
+    previous.map((finding) => [spanKey(finding), finding]),
+  );
+  const claimed = new Set<Finding>();
 
   return incoming.map((finding) => {
-    const existing = previousById.get(finding.id);
+    let existing: Finding | undefined = previousBySpan.get(spanKey(finding));
+    if (!existing || claimed.has(existing)) {
+      const byId = previousById.get(finding.id);
+      existing = byId && !claimed.has(byId) ? byId : undefined;
+    }
     if (!existing) {
       return finding;
     }
+    claimed.add(existing);
 
     const spanStillPresent =
       text.includes(finding.spanText) || text.includes(existing.spanText);

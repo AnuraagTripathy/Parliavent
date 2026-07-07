@@ -1,7 +1,7 @@
+import { scopedFindingId } from "@/lib/scopedIds";
 import type {
   ClaimKind,
   ClaimVerdict,
-  EvidenceSearchResponse,
   Finding,
   JudgeMode,
   PublishedArgument,
@@ -110,11 +110,6 @@ export interface CreateDebatePostResponse {
   };
 }
 
-/** @deprecated Use createDebatePost */
-export type CreateReplyRequest = CreateDebatePostRequest & {
-  parentPostId: string;
-};
-
 export async function createDebatePost(
   payload: CreateDebatePostRequest,
 ): Promise<CreateDebatePostResponse> {
@@ -137,12 +132,6 @@ export async function createDebatePost(
   }
 
   return res.json();
-}
-
-export async function createReply(
-  payload: CreateDebatePostRequest & { parentPostId: string },
-): Promise<CreateDebatePostResponse> {
-  return createDebatePost({ ...payload, postType: "reply" });
 }
 
 export async function deleteDraftPost(postId: string): Promise<void> {
@@ -296,7 +285,9 @@ export async function persistPublishFlow(
   for (const finding of findings) {
     const evidencePayload = findingToEvidencePayload(finding);
     if (evidencePayload) {
-      await saveEvidence(finding.id, evidencePayload);
+      // Findings are stored under post-scoped ids (see src/lib/scopedIds.ts),
+      // so the evidence route must be addressed by the scoped id too.
+      await saveEvidence(scopedFindingId(postId, finding.id), evidencePayload);
     }
   }
 

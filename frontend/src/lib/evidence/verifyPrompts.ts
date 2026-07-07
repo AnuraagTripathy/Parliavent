@@ -1,4 +1,4 @@
-export const EVIDENCE_VERIFIER_PROMPT_VERSION = "evidence-engine-v2";
+export const EVIDENCE_VERIFIER_PROMPT_VERSION = "evidence-engine-v2.1";
 
 export const EVIDENCE_VERIFIER_SYSTEM_PROMPT = `You are an evidence verifier for a debate platform.
 
@@ -53,6 +53,11 @@ claimVerdict rules:
 - If sources only support a narrower version, use "partially_supported".
 - If sources are related but do not answer the claim, use "unsupported" or "unclear".
 - Vague comparatives like "Europe does it and cities are nicer" often yield "too_broad" or "partially_supported".
+
+claimVerdict / supportLevel consistency (required):
+- If claimVerdict is "contradicted" or "unsupported", NO source may use "supports" or "partially_supports".
+- In those cases, label each source "contradicts", "related_only", or "unclear" — never attachable support.
+- Per-source supportLevel must agree with the overall claimVerdict. Do not contradict yourself.
 
 supportLevel values per source:
 - "supports"

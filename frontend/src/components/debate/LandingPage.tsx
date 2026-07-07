@@ -5,10 +5,11 @@ import { CTASection } from "@/components/ui/hero-dithering-card";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { FadeIn, StaggerGroup, StaggerItem } from "@/components/ui/fade-in";
-import { formatDeskBangs, getHotIssues } from "@/lib/mockFeed";
+import { SHOWCASE_DEBATE_META } from "@/lib/showcaseMeta";
 
 interface LandingPageProps {
   onEnterDebates: () => void;
+  isSignedIn?: boolean;
 }
 
 const PRINCIPLES = [
@@ -44,12 +45,25 @@ const CONTRASTS = [
   },
 ];
 
-export function LandingPage({ onEnterDebates }: LandingPageProps) {
-  const hotIssues = getHotIssues().slice(0, 3);
+export function LandingPage({ onEnterDebates, isSignedIn }: LandingPageProps) {
+  const previewDebates = Object.entries(SHOWCASE_DEBATE_META)
+    .slice(0, 3)
+    .map(([slug, meta], index) => ({
+      id: slug,
+      title: meta.motion,
+      description: meta.description,
+      category: meta.category,
+      deskBangs: 120 + index * 40,
+      starterCount: 1,
+      isHot: index === 0,
+    }));
 
   return (
     <div className="w-full">
-      <CTASection onStart={onEnterDebates} />
+      <CTASection
+        onStart={onEnterDebates}
+        ctaLabel={isSignedIn ? "Enter the debates" : "Get started free"}
+      />
 
       <FadeIn className="w-full px-4 py-20 md:px-8 lg:px-12 xl:px-16">
         <div className="mx-auto mb-14 max-w-3xl text-center">
@@ -143,7 +157,7 @@ export function LandingPage({ onEnterDebates }: LandingPageProps) {
         </div>
 
         <StaggerGroup className="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {hotIssues.map((issue) => (
+          {previewDebates.map((issue) => (
             <StaggerItem key={issue.id}>
             <Card
               className="h-full border-border/80 bg-card transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20"
@@ -167,7 +181,7 @@ export function LandingPage({ onEnterDebates }: LandingPageProps) {
                   {issue.description}
                 </p>
                 <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                  <span>🪑 {formatDeskBangs(issue.deskBangs)}</span>
+                  <span>🪑 {issue.deskBangs}</span>
                   <span className="inline-flex items-center gap-1">
                     <MessageSquare className="h-3.5 w-3.5" />
                     {issue.starterCount} starters

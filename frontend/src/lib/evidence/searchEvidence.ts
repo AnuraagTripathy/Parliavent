@@ -13,7 +13,11 @@ import {
   filterTavilyResults,
   mapTavilyResultsToSources,
 } from "@/lib/evidence/sourceUtils";
-import { finalizeEvidenceSources } from "@/lib/evidence/sourceEligibility";
+import {
+  enforceAttachabilityForClaimVerdict,
+  finalizeEvidenceSources,
+} from "@/lib/evidence/sourceEligibility";
+import { cleanEvidenceText } from "@/lib/evidence/cleanEvidenceText";
 import { sortEvidenceSources } from "@/lib/evidence/sortEvidenceSources";
 import {
   applyVerificationToSources,
@@ -23,6 +27,13 @@ import { verifyEvidenceWithGroq } from "@/lib/evidence/verifyEvidenceWithGroq";
 import type { EvidenceSearchResponse, EvidenceSource } from "@/lib/types";
 
 export { TavilyConfigError, TavilySearchError };
+
+export type EvidencePipelineStage =
+  | "searching"
+  | "fetching_pages"
+  | "extracting_passages"
+  | "ranking_passages"
+  | "verifying";
 
 type VerificationBasis = NonNullable<EvidenceSearchResponse["verificationBasis"]>;
 
@@ -65,10 +76,21 @@ function collectResponsePassages(sources: SourceWithPassages[]): string[] {
   return sources.flatMap((source) => source.evidencePassages ?? []).slice(0, 10);
 }
 
+async function reportStage(
+  onStage: ((stage: EvidencePipelineStage) => void | Promise<void>) | undefined,
+  stage: EvidencePipelineStage,
+): Promise<void> {
+  if (!onStage) {
+    return;
+  }
+  await onStage(stage);
+}
+
 export async function searchEvidence(params: {
   claim: string;
   argumentText?: string;
   threadId?: string;
+  onStage?: (stage: EvidencePipelineStage) => void | Promise<void>;
 }): Promise<EvidenceSearchResponse> {
   const plannedQueries = planEvidenceQueries(
     params.claim,
@@ -76,6 +98,7 @@ export async function searchEvidence(params: {
     params.threadId,
   );
 
+  await reportStage(params.onStage, "searching");
   const tavilyHits = await searchWithPlannedQueries(plannedQueries);
   const hitByUrl = new Map(tavilyHits.map((hit) => [hit.url, hit]));
   const baseSources = mapHitsToSources(params.claim, tavilyHits);
@@ -87,7 +110,10 @@ export async function searchEvidence(params: {
     );
   }
 
+  await reportStage(params.onStage, "fetching_pages");
   const fetchedPages = await fetchPages(baseSources.map((source) => source.url));
+
+  await reportStage(params.onStage, "extracting_passages");
   const passageInputs = baseSources
     .map((source) => {
       const fetched = fetchedPages.get(source.url);
@@ -112,15 +138,17 @@ export async function searchEvidence(params: {
     })
     .filter((input): input is NonNullable<typeof input> => input !== null);
 
+  await reportStage(params.onStage, "ranking_passages");
   const rankedPassages = rankPassagesForSources(passageInputs);
   const sourcesWithPassages: SourceWithPassages[] = baseSources.map((source) => ({
     ...source,
-    evidencePassages: rankedPassages.get(source.id) ?? [],
+    evidencePassages: (rankedPassages.get(source.id) ?? []).map(cleanEvidenceText),
   }));
 
   const verificationBasis = computeVerificationBasis(sourcesWithPassages);
 
   try {
+    await reportStage(params.onStage, "verifying");
     const verified = await verifyEvidenceWithGroq({
       claim: params.claim,
       argumentText: params.argumentText,
@@ -128,9 +156,9 @@ export async function searchEvidence(params: {
       verificationBasis,
     });
 
-    const verifiedSources = applyVerificationToSources(
-      sourcesWithPassages,
-      verified,
+    const verifiedSources = enforceAttachabilityForClaimVerdict(
+      applyVerificationToSources(sourcesWithPassages, verified),
+      verified.claimVerdict,
     );
 
     return {

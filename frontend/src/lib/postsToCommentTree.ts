@@ -29,6 +29,7 @@ export function postToComment(
 export function startersToComments(
   starters: PublishedArgument[],
   posts: PublishedArgument[],
+  fullText = true,
 ): CommentType[] {
-  return starters.map((starter) => postToComment(starter, posts));
+  return starters.map((starter) => postToComment(starter, posts, fullText));
 }

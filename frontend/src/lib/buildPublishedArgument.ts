@@ -1,11 +1,7 @@
 import {
-  citationsFromFindings,
-  sourcesFromFindings,
-} from "./citationsFromFindings";
-import {
-  buildClaimCaveatsFromFindings,
+  buildPublishedReviewFromFindings,
   hasOpenNonCaveatedFindings,
-} from "./claimCaveats";
+} from "./publishedReviewFindings";
 import type { Finding, PostKind, PublishedArgument } from "./types";
 
 export function buildPublishedArgument(params: {
@@ -19,15 +15,7 @@ export function buildPublishedArgument(params: {
   debateId?: string;
   dbPostId?: string;
 }): PublishedArgument {
-  const sources = sourcesFromFindings(params.findings);
-  const citations = citationsFromFindings(params.findings);
-  const claimCaveats = buildClaimCaveatsFromFindings(params.findings, params.text);
-
-  const contestedFallacies = params.findings
-    .filter((f) => f.type === "fallacy" && f.status === "disputed")
-    .map((f) => f.subtitle)
-    .filter((name): name is string => Boolean(name));
-
+  const review = buildPublishedReviewFromFindings(params.findings);
   const hasOtherOpenFindings = hasOpenNonCaveatedFindings(params.findings);
 
   return {
@@ -35,16 +23,37 @@ export function buildPublishedArgument(params: {
     author: params.author ?? "You",
     postedAt: "Just now",
     text: params.text,
-    sources,
-    citations,
-    claimCaveats: claimCaveats.length > 0 ? claimCaveats : undefined,
+    publishedFindings: params.findings.map((f) => ({
+      id: f.id,
+      type: f.type,
+      status: f.status,
+      spanText: f.spanText,
+      title: f.title,
+      reason: f.reason,
+      subtitle: f.subtitle,
+      evidenceClaimVerdict: f.evidenceClaimVerdict,
+      selectedSourceId: f.selectedSourceId,
+      sources: f.sources,
+    })),
+    sources: review.sources,
+    citations: review.citations,
+    claimCaveats:
+      review.claimCaveats.length > 0 ? review.claimCaveats : undefined,
+    needsEvidence:
+      review.needsEvidence.length > 0 ? review.needsEvidence : undefined,
+    reviewFallacies:
+      review.reviewFallacies.length > 0 ? review.reviewFallacies : undefined,
+    reviewClarity:
+      review.reviewClarity.length > 0 ? review.reviewClarity : undefined,
     kind: params.kind,
     issueId: params.issueId,
     parentId: params.parentId,
     deskBangs: 0,
     userBanged: false,
     contestedFallacies:
-      contestedFallacies.length > 0 ? contestedFallacies : undefined,
+      review.contestedFallacies.length > 0
+        ? review.contestedFallacies
+        : undefined,
     caveats: hasOtherOpenFindings
       ? ["Posted with unresolved review item."]
       : undefined,
@@ -61,8 +70,8 @@ export function formatByline(argument: PublishedArgument): string {
     sourceCount === 1 ? "1 source attached" : `${sourceCount} sources attached`;
   const flagLabel =
     contestedCount === 1
-      ? "1 flag contested"
-      : `${contestedCount} flags contested`;
+      ? "1 logical fallacy"
+      : `${contestedCount} logical fallacies`;
 
   return `Vetted, ${sourceLabel}, ${flagLabel}`;
 }

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import type { DebateMode } from "@prisma/client";
+import { Prisma, type DebateMode } from "@prisma/client";
+import { requireAuthUser, unauthorizedResponse } from "@/lib/auth/session";
+import { debateListWhere } from "@/lib/db/debateVisibility";
 import { prisma } from "@/lib/db";
 import { toSavedDebateSummary } from "@/lib/db/mappers";
 import { slugFromMotion } from "@/lib/db/slug";
@@ -8,17 +10,29 @@ import type { JudgeMode } from "@/lib/types";
 const debateListInclude = {
   posts: {
     include: {
-      _count: {
-        select: { findings: true, caveats: true },
+      findings: {
+        include: {
+          evidenceResult: true,
+          findingSources: { include: { source: true } },
+        },
       },
+      caveats: { select: { type: true, findingId: true, message: true } },
     },
     orderBy: { createdAt: "asc" as const },
   },
 } as const;
 
-export async function GET() {
+export async function GET(request: Request) {
+  let auth;
+  try {
+    auth = await requireAuthUser(request);
+  } catch {
+    return unauthorizedResponse();
+  }
+
   try {
     const debates = await prisma.debate.findMany({
+      where: debateListWhere(auth.authorId),
       orderBy: { updatedAt: "desc" },
       include: debateListInclude,
     });
@@ -46,6 +60,13 @@ function isValidMode(mode: unknown): mode is JudgeMode {
 }
 
 export async function POST(request: Request) {
+  let auth;
+  try {
+    auth = await requireAuthUser(request);
+  } catch {
+    return unauthorizedResponse();
+  }
+
   let body: unknown;
 
   try {
@@ -58,7 +79,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { motion, text, mode, authorName } = body as Record<string, unknown>;
+  const { motion, text, mode } = body as Record<string, unknown>;
 
   if (typeof motion !== "string" || motion.trim().length < 8) {
     return NextResponse.json(
@@ -77,37 +98,59 @@ export async function POST(request: Request) {
 
   const trimmedMotion = motion.trim();
   const baseSlug = slugFromMotion(trimmedMotion);
-  const author =
-    typeof authorName === "string" && authorName.trim()
-      ? authorName.trim()
-      : "Guest";
+  const author = auth.authorName;
 
   try {
-    let slug = baseSlug;
-    let suffix = 0;
+    // Create-and-retry instead of check-then-create: two concurrent creates
+    // with the same motion would both pass a pre-check and one would 500 on
+    // the unique constraint. Sequential suffixes first, then random ones for
+    // popular motions.
+    const MAX_SLUG_ATTEMPTS = 6;
+    let debate: Prisma.DebateGetPayload<{ include: { posts: true } }> | null =
+      null;
 
-    while (await prisma.debate.findUnique({ where: { slug } })) {
-      suffix += 1;
-      slug = `${baseSlug}-${suffix}`;
+    for (let attempt = 0; attempt < MAX_SLUG_ATTEMPTS; attempt++) {
+      const slug =
+        attempt === 0
+          ? baseSlug
+          : attempt <= 3
+            ? `${baseSlug}-${attempt}`
+            : `${baseSlug}-${Math.random().toString(36).slice(2, 8)}`;
+
+      try {
+        debate = await prisma.debate.create({
+          data: {
+            motion: trimmedMotion,
+            slug,
+            mode: mode as DebateMode,
+            posts: {
+              create: {
+                text: text.trim(),
+                postType: "starter",
+                authorId: auth.authorId,
+                authorName: author,
+              },
+            },
+          },
+          include: {
+            posts: true,
+          },
+        });
+        break;
+      } catch (error) {
+        const isUniqueViolation =
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2002";
+        if (!isUniqueViolation) throw error;
+      }
     }
 
-    const debate = await prisma.debate.create({
-      data: {
-        motion: trimmedMotion,
-        slug,
-        mode: mode as DebateMode,
-        posts: {
-          create: {
-            text: text.trim(),
-            postType: "starter",
-            authorName: author,
-          },
-        },
-      },
-      include: {
-        posts: true,
-      },
-    });
+    if (!debate) {
+      return NextResponse.json(
+        { error: "Failed to create debate" },
+        { status: 500 },
+      );
+    }
 
     const post = debate.posts[0];
 

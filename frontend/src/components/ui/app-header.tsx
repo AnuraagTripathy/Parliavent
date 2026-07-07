@@ -18,6 +18,7 @@ interface AppHeaderProps {
   onLogoClick?: () => void;
   onCreate?: () => void;
   createLabel?: string;
+  authSlot?: React.ReactNode;
 }
 
 export function AppHeader({
@@ -25,6 +26,7 @@ export function AppHeader({
   onLogoClick,
   onCreate,
   createLabel = "Create",
+  authSlot,
 }: AppHeaderProps) {
   const [open, setOpen] = React.useState(false);
   const scrolled = useScroll(10);
@@ -87,6 +89,7 @@ export function AppHeader({
                 {createLabel}
               </Button>
             )}
+            {authSlot && <div className="ml-2">{authSlot}</div>}
           </div>
 
           <Button
@@ -137,6 +140,7 @@ export function AppHeader({
                 {createLabel}
               </Button>
             )}
+            {authSlot && <div className="flex justify-center pt-2">{authSlot}</div>}
           </div>
         </div>
       </header>

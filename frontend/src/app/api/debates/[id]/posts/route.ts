@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { PostType } from "@prisma/client";
+import { requireAuthUser, unauthorizedResponse } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 
 const VALID_POST_TYPES: PostType[] = ["starter", "reply"];
@@ -9,6 +10,13 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
+
+  let auth;
+  try {
+    auth = await requireAuthUser(request);
+  } catch {
+    return unauthorizedResponse();
+  }
 
   let body: unknown;
   try {
@@ -21,7 +29,7 @@ export async function POST(
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { parentPostId, text, authorName, postType } = body as Record<
+  const { parentPostId, text, postType } = body as Record<
     string,
     unknown
   >;
@@ -46,10 +54,7 @@ export async function POST(
     return NextResponse.json({ error: "text must be a string" }, { status: 400 });
   }
 
-  const author =
-    typeof authorName === "string" && authorName.trim()
-      ? authorName.trim()
-      : "Guest";
+  const author = auth.authorName;
 
   try {
     const debate = await prisma.debate.findFirst({
@@ -86,6 +91,7 @@ export async function POST(
         parentPostId: resolvedParentId,
         text: typeof text === "string" ? text.trim() : "",
         postType: type,
+        authorId: auth.authorId,
         authorName: author,
       },
     });

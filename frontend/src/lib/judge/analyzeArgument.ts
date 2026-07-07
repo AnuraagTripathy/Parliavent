@@ -1,6 +1,6 @@
 import { judgeText } from "@/lib/mockJudge";
 import type { Finding, JudgeRequest } from "@/lib/types";
-import { analyzeWithGroq, getGroqModel } from "./analyzeWithGroq";
+import { analyzeWithGroq, getGroqJudgeModel } from "./analyzeWithGroq";
 import {
   getJudgeCacheHit,
   normalizeJudgeText,
@@ -19,7 +19,7 @@ export async function analyzeArgument(
     return judgeText(params.text);
   }
 
-  const model = getGroqModel();
+  const model = getGroqJudgeModel();
   const cacheParams = {
     normalizedText: normalizeJudgeText(params.text),
     mode: params.mode,

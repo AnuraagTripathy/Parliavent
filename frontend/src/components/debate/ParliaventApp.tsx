@@ -1,7 +1,10 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useUser } from "@hexclave/next";
 import { AnimatePresence } from "framer-motion";
+import { AuthUserButton } from "@/components/auth/AuthUserButton";
 import { AppHeader } from "@/components/ui/app-header";
 import { PageTransition } from "@/components/ui/fade-in";
 import { createDebate, deleteDraftPost, fetchDebate } from "@/lib/api/persistence";
@@ -11,27 +14,79 @@ import { CreateDebateScreen } from "./CreateDebateScreen";
 import { DebateFeed } from "./DebateFeed";
 import { DebateApp } from "./DebateApp";
 import { IssueThread } from "./IssueThread";
-import { LandingPage } from "./LandingPage";
 import { PublishedArgumentView } from "./PublishedArgumentView";
-import { getIssue, getPost, MOCK_POSTS } from "@/lib/mockFeed";
+import { getAuthorDisplayName } from "@/lib/auth/display-name";
 import type {
   AppScreen,
   ComposerContext,
   PublishedArgument,
 } from "@/lib/types";
 
-export function ParliaventApp() {
-  const [screen, setScreen] = useState<AppScreen>("landing");
-  const [posts, setPosts] = useState<PublishedArgument[]>(() => [
-    ...MOCK_POSTS,
-  ]);
-  const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
+interface ParliaventAppProps {
+  /** When set, loads this debate thread from the URL (/app/debates/[slug]). */
+  initialDebateSlug?: string;
+}
+
+export function ParliaventApp({ initialDebateSlug }: ParliaventAppProps = {}) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const user = useUser();
+  const authorName = getAuthorDisplayName(user);
+  const [screen, setScreen] = useState<AppScreen>(
+    initialDebateSlug ? "issue" : "feed",
+  );
+  const [posts, setPosts] = useState<PublishedArgument[]>([]);
+  const [selectedIssueId, setSelectedIssueId] = useState<string | null>(
+    initialDebateSlug ?? null,
+  );
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [composerContext, setComposerContext] =
     useState<ComposerContext | null>(null);
   const [isCreatingDebate, setIsCreatingDebate] = useState(false);
   const [loadingPostId, setLoadingPostId] = useState<string | null>(null);
   const [feedRefreshKey, setFeedRefreshKey] = useState(0);
+  const [debateLoading, setDebateLoading] = useState(Boolean(initialDebateSlug));
+  const composeHandledRef = useRef<string | null>(null);
+
+  const composeParentId = searchParams.get("parent");
+  const isComposeUrl = searchParams.get("compose") === "1";
+
+  useEffect(() => {
+    setPosts([]);
+    if (!initialDebateSlug) {
+      setScreen("feed");
+      setSelectedIssueId(null);
+    }
+    setSelectedPostId(null);
+    setComposerContext(null);
+    setFeedRefreshKey((k) => k + 1);
+  }, [user?.id, initialDebateSlug]);
+
+  useEffect(() => {
+    if (!initialDebateSlug) return;
+    composeHandledRef.current = null;
+    void loadDebateBySlug(initialDebateSlug);
+  }, [initialDebateSlug]);
+
+  useEffect(() => {
+    if (!initialDebateSlug || !isComposeUrl || debateLoading) return;
+    if (!composeParentId) return;
+
+    const composeKey = `${initialDebateSlug}:${composeParentId}`;
+    if (composeHandledRef.current === composeKey) return;
+    composeHandledRef.current = composeKey;
+
+    const parent = posts.find((p) => p.id === composeParentId);
+    if (parent) {
+      openReplyComposer(parent);
+    }
+  }, [
+    initialDebateSlug,
+    isComposeUrl,
+    composeParentId,
+    debateLoading,
+    posts,
+  ]);
 
   const selectedPost = selectedPostId
     ? posts.find((p) => p.id === selectedPostId)
@@ -51,11 +106,6 @@ export function ParliaventApp() {
     );
   }, []);
 
-  function openIssue(issueId: string) {
-    setSelectedIssueId(issueId);
-    setScreen("issue");
-  }
-
   function mergeDebatePosts(savedPosts: PublishedArgument[]) {
     setPosts((prev) => {
       const savedIds = new Set(savedPosts.map((p) => p.id));
@@ -64,33 +114,58 @@ export function ParliaventApp() {
     });
   }
 
-  async function openSavedDebate(debateId: string) {
+  function debateThreadPath(slug: string) {
+    return `/app/debates/${slug}`;
+  }
+
+  function debateComposePath(slug: string, parentId: string) {
+    return `/app/debates/${slug}?compose=1&parent=${encodeURIComponent(parentId)}`;
+  }
+
+  async function loadDebateBySlug(slug: string) {
+    setDebateLoading(true);
     try {
-      const { debate } = await fetchDebate(debateId);
+      const { debate } = await fetchDebate(slug);
       mergeDebatePosts(debate.posts);
 
       const starter =
         debate.posts.find((p) => p.kind === "starter" && !p.parentId) ??
+        debate.posts.find((p) => p.kind === "starter") ??
         debate.posts[0];
 
       if (!starter) return;
 
-      if (starter.publishedAt) {
-        setSelectedPostId(starter.id);
-        setScreen("post");
+      if (!starter.publishedAt) {
+        startComposer({
+          mode: "starter",
+          issueId: debate.slug,
+          issueTitle: debate.motion,
+          judgeMode: debate.mode,
+          initialText: starter.text,
+          isCustomDebate: true,
+          debateId: debate.id,
+          dbPostId: starter.dbPostId ?? starter.id,
+        });
         return;
       }
 
-      startComposer({
-        mode: "starter",
-        issueId: debate.slug,
-        issueTitle: debate.motion,
-        judgeMode: debate.mode,
-        initialText: starter.text,
-        isCustomDebate: true,
-        debateId: debate.id,
-        dbPostId: starter.dbPostId ?? starter.id,
-      });
+      setSelectedIssueId(debate.slug);
+      setSelectedPostId(null);
+      if (!isComposeUrl) {
+        setScreen("issue");
+      }
+    } catch (err) {
+      console.warn("Could not open saved debate:", err);
+    } finally {
+      setDebateLoading(false);
+    }
+  }
+
+  async function openSavedDebate(slugOrId: string) {
+    try {
+      const { debate } = await fetchDebate(slugOrId);
+      mergeDebatePosts(debate.posts);
+      router.push(debateThreadPath(debate.slug));
     } catch (err) {
       console.warn("Could not open saved debate:", err);
     }
@@ -126,14 +201,30 @@ export function ParliaventApp() {
     setScreen("composer");
   }
 
-  function startStarter(issueId: string) {
-    const issue = getIssue(issueId);
-    if (!issue) return;
+  function openReplyComposer(parent: PublishedArgument) {
+    const parentExcerpt = excerptText(parent.text);
+    const issueId = parent.issueId ?? parent.debateId ?? selectedIssueId ?? "";
+
     startComposer({
-      mode: "starter",
+      mode: "response",
       issueId,
-      issueTitle: issue.title,
+      issueTitle: parent.debateMotion ?? "Debate",
+      judgeMode: parent.debateMode,
+      parentId: parent.id,
+      parentDbPostId: parent.dbPostId ?? parent.id,
+      parentAuthor: parent.author,
+      parentPreview: parentExcerpt,
+      parentArgument: parent.text,
+      debateId: parent.debateId,
+      isSavedDebate: true,
     });
+  }
+
+  function startStarter(issueId: string) {
+    const debatePost = posts.find((p) => p.issueId === issueId && p.debateId);
+    if (debatePost?.debateId) {
+      void startAnotherStarter(debatePost);
+    }
   }
 
   async function startCustomDebate(draft: {
@@ -148,7 +239,7 @@ export function ParliaventApp() {
         motion: draft.motion,
         text: draft.argument,
         mode: draft.judgeMode ?? "structured_debate",
-        authorName: "Guest",
+        authorName,
       });
 
       startComposer({
@@ -182,40 +273,16 @@ export function ParliaventApp() {
   }
 
   function startReply(parentId: string) {
-    const parent = getPost(parentId) ?? posts.find((p) => p.id === parentId);
+    const parent = posts.find((p) => p.id === parentId);
     if (!parent) return;
 
-    const parentExcerpt = excerptText(parent.text);
-
-    if (parent.debateId) {
-      startComposer({
-        mode: "response",
-        issueId: parent.issueId ?? parent.debateId,
-        issueTitle: parent.debateMotion ?? "Debate",
-        judgeMode: parent.debateMode,
-        parentId: parent.id,
-        parentDbPostId: parent.dbPostId ?? parent.id,
-        parentAuthor: parent.author,
-        parentPreview: parentExcerpt,
-        parentArgument: parent.text,
-        debateId: parent.debateId,
-        isSavedDebate: true,
-      });
+    const slug = parent.issueId ?? selectedIssueId;
+    if (slug) {
+      router.push(debateComposePath(slug, parentId));
       return;
     }
 
-    if (!parent.issueId) return;
-    const issue = getIssue(parent.issueId);
-    if (!issue) return;
-    startComposer({
-      mode: "response",
-      issueId: parent.issueId,
-      issueTitle: issue.title,
-      parentId,
-      parentAuthor: parent.author,
-      parentPreview: parentExcerpt,
-      parentArgument: parent.text,
-    });
+    openReplyComposer(parent);
   }
 
   async function startAnotherStarter(sourcePost: PublishedArgument) {
@@ -240,22 +307,33 @@ export function ParliaventApp() {
 
   function handlePosted(post: PublishedArgument) {
     setPosts((prev) => [post, ...prev]);
-    setSelectedIssueId(post.issueId ?? null);
-    setSelectedPostId(post.id);
+    const slug = post.issueId;
+    if (slug) {
+      router.replace(debateThreadPath(slug));
+    }
+    setSelectedIssueId(slug ?? null);
+    setSelectedPostId(null);
+    setScreen("issue");
     setFeedRefreshKey((k) => k + 1);
   }
 
   function goToLanding() {
-    setScreen("landing");
+    window.location.href = "/";
+  }
+
+  function goToFeed() {
+    router.push("/app");
+    setScreen("feed");
     setSelectedIssueId(null);
     setSelectedPostId(null);
     setComposerContext(null);
   }
 
-  function goToFeed() {
-    setScreen("feed");
-    setSelectedIssueId(null);
+  function returnToDebateThread(slug: string) {
+    router.replace(debateThreadPath(slug));
+    setSelectedIssueId(slug);
     setSelectedPostId(null);
+    setScreen("issue");
     setComposerContext(null);
   }
 
@@ -269,10 +347,8 @@ export function ParliaventApp() {
       }
     }
 
-    if (ctx?.parentId && ctx?.debateId) {
-      setSelectedPostId(ctx.parentId);
-      setScreen("post");
-      setComposerContext(null);
+    if (ctx?.parentId && ctx?.issueId) {
+      returnToDebateThread(ctx.issueId);
       if (ctx.debateId) {
         fetchDebate(ctx.debateId)
           .then(({ debate }) => mergeDebatePosts(debate.posts))
@@ -293,12 +369,10 @@ export function ParliaventApp() {
       return;
     }
 
-    if (ctx?.parentId) {
-      setScreen("issue");
-      setSelectedIssueId(ctx.issueId);
-    } else if (ctx?.issueId && getIssue(ctx.issueId)) {
-      setScreen("issue");
-      setSelectedIssueId(ctx.issueId);
+    if (ctx?.parentId && ctx.issueId) {
+      returnToDebateThread(ctx.issueId);
+    } else if (ctx?.issueId) {
+      returnToDebateThread(ctx.issueId);
     } else {
       goToFeed();
     }
@@ -310,7 +384,7 @@ export function ParliaventApp() {
       {
         label: "Home",
         onClick: goToLanding,
-        active: screen === "landing",
+        active: false,
       },
       {
         label: "Debates",
@@ -334,14 +408,18 @@ export function ParliaventApp() {
   }, [screen, selectedIssueId, selectedPostId]);
 
   function renderScreen() {
+    if (debateLoading && initialDebateSlug) {
+      return (
+        <div className="w-full px-6 py-16 text-center text-muted-foreground">
+          Loading debate…
+        </div>
+      );
+    }
+
     switch (screen) {
-      case "landing":
-        return <LandingPage onEnterDebates={goToFeed} />;
       case "feed":
         return (
           <DebateFeed
-            onOpenIssue={openIssue}
-            onNewStarter={startStarter}
             onOpenSavedDebate={openSavedDebate}
             refreshKey={feedRefreshKey}
           />
@@ -360,8 +438,11 @@ export function ParliaventApp() {
             issueId={selectedIssueId}
             posts={posts}
             onBack={goToFeed}
-            onOpenPost={openPost}
-            onNewStarter={() => startStarter(selectedIssueId)}
+            onNewStarter={
+              posts.some((p) => p.issueId === selectedIssueId && p.debateId)
+                ? () => startStarter(selectedIssueId)
+                : undefined
+            }
             onReply={startReply}
             onDeskBang={toggleDeskBang}
           />
@@ -374,21 +455,11 @@ export function ParliaventApp() {
               posts={posts}
               isLoading={loadingPostId === selectedPost.id}
               onBack={() => {
-                if (selectedPost.debateId) {
-                  if (selectedPost.parentId) {
-                    setSelectedPostId(selectedPost.parentId);
-                    setScreen("post");
-                    return;
-                  }
-                  goToFeed();
+                if (selectedPost.issueId) {
+                  router.push(debateThreadPath(selectedPost.issueId));
                   return;
                 }
-                if (selectedPost.issueId && getIssue(selectedPost.issueId)) {
-                  setSelectedIssueId(selectedPost.issueId);
-                  setScreen("issue");
-                } else {
-                  goToFeed();
-                }
+                goToFeed();
               }}
               onDeskBang={() => toggleDeskBang(selectedPost.id)}
               onReply={() => startReply(selectedPost.id)}
@@ -398,7 +469,6 @@ export function ParliaventApp() {
                   ? () => openPost(selectedPost.parentId!)
                   : undefined
               }
-              onThreadOpen={openPost}
               onThreadReply={startReply}
               onThreadDeskBang={toggleDeskBang}
             />
@@ -420,6 +490,7 @@ export function ParliaventApp() {
         return composerContext ? (
           <DebateApp
             context={composerContext}
+            authorName={authorName}
             onBack={backFromComposer}
             onPosted={handlePosted}
             onFinished={() => {
@@ -427,30 +498,28 @@ export function ParliaventApp() {
               if (!ctx) return;
 
               if (ctx.parentId && ctx.debateId) {
-                setComposerContext(null);
                 fetchDebate(ctx.debateId)
                   .then(({ debate }) => {
                     mergeDebatePosts(debate.posts);
-                    setSelectedPostId(ctx.parentId!);
-                    setScreen("post");
+                    returnToDebateThread(ctx.issueId);
                   })
                   .catch(() => {
-                    setSelectedPostId(ctx.parentId!);
-                    setScreen("post");
+                    returnToDebateThread(ctx.issueId);
                   });
                 return;
               }
 
-              if (ctx.isCustomDebate) {
-                setComposerContext(null);
-                setScreen("post");
+              if (ctx.isCustomDebate && ctx.issueId) {
+                returnToDebateThread(ctx.issueId);
                 return;
               }
 
-              const issueId = ctx.issueId;
-              setComposerContext(null);
-              setSelectedIssueId(issueId);
-              setScreen("issue");
+              if (ctx.issueId) {
+                returnToDebateThread(ctx.issueId);
+                return;
+              }
+
+              goToFeed();
             }}
           />
         ) : null;
@@ -466,6 +535,7 @@ export function ParliaventApp() {
         onLogoClick={goToLanding}
         onCreate={() => setScreen("create")}
         createLabel="Create debate"
+        authSlot={<AuthUserButton />}
       />
 
       <AnimatePresence mode="wait">

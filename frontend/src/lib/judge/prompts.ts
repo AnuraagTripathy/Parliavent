@@ -1,7 +1,7 @@
 import type { JudgeMode, JudgePostType, JudgeUserStance } from "@/lib/types";
 
 /** Bump when prompt behavior changes so server cache entries invalidate. */
-export const JUDGE_PROMPT_VERSION = "judge-v5-reply-relevance";
+export const JUDGE_PROMPT_VERSION = "judge-v9-precision-clarity";
 
 export interface JudgeDebateContext {
   threadId?: string;
@@ -35,9 +35,9 @@ Your goal is not to find as many issues as possible. Your goal is to surface onl
 
 Identify important issues:
 - factual claims that clearly need evidence (type: "claim")
-- unsupported, vague, exaggerated, or overbroad statements (type: "claim")
+- unsupported, exaggerated, or overbroad factual assertions (type: "claim")
 - possible logical fallacies, but only when the reasoning error is clear (type: "fallacy")
-- unclear, emotionally loaded, or easily misunderstood wording (type: "clarity")
+- unclear, imprecise, emotionally loaded, or easily misunderstood wording (type: "clarity")
 
 Review strictness:
 - Short arguments should usually receive 0-2 findings.
@@ -71,6 +71,16 @@ Cautious policy judgment rules:
 Contrast — these ARE claim findings (specific, empirical, or comparative-as-fact):
 - "Europe does it and their cities are way nicer." — vague factual comparison presented as fact, not a hedged policy view.
 - "Studies prove congestion pricing always cuts emissions by 40% within one year." — specific statistic and causal certainty.
+- "which we know causes cancer" — strong causal assertion presented as settled fact.
+
+Claim vs clarity — precision and wording:
+- type "claim" is for assertions readers may challenge as fact — especially causal links, statistics, "we know", "proven", universal outcomes. These may need sources.
+- type "clarity" is for imprecise, vague, or overstated wording where the fix is better specificity — NOT attaching a source.
+- If the issue is missing type, level, amount, or scope ("emit radiation" without saying what kind), use clarity — not claim.
+- Words like "obviously" or "clearly" on a mechanism step are clarity issues (overstated certainty), not separate claim findings — unless the sentence itself asserts a contested causal fact.
+- Do NOT offer "Find sources" style fixes for pure precision problems. Use suggestedRewrite instead.
+- Example — clarity (NOT claim): "they obviously emit radiation" → ask for specificity or drop "obviously"; the issue is imprecise wording, not a missing citation for Bluetooth emissions.
+- Example — claim: "which we know causes cancer" → contested causal assertion needing evidence.
 
 Insults and character attacks — NOT claim findings:
 - When a sentence attacks a group's character, motives, or intelligence instead of the policy ("everyone who X is just Y", "people who support X are lazy"), the problem is reasoning or tone — NOT missing evidence.
@@ -89,6 +99,26 @@ Fallacy rules:
 - Never accuse the author.
 - Prefer plain-language titles over jargon.
 - Put the fallacy name in subtitle only.
+
+Informal register and word choice — clarity, NOT fallacy:
+- Casual filler, slang, or informal address ("bro", "dude", "literally" as emphasis, "kinda", "ngl", etc.) is a word-choice issue, NOT a logical fallacy.
+- Do NOT label informal tone as "Appeal to emotion" unless the argument actually substitutes fear, pity, or outrage for reasoning.
+- A fallacy requires a reasoning-structure error (false dilemma, ad hominem, straw man, etc.), not casual voice or debater slang.
+- For informal words that may weaken credibility in formal debate, use type "clarity" with a plain title like "Consider clearer wording" or "This word may distract readers".
+- Include suggestedRewrite that removes or replaces the casual word while preserving the author's stance.
+- Do NOT return a finding for every informal word. Only flag when it noticeably weakens clarity or credibility — at most one such finding per argument.
+- Example — use clarity (NOT fallacy):
+  spanText: "bro" → title: "Consider dropping casual filler", type: "clarity", suggestedRewrite: remove "bro" from the sentence.
+- Example — still use fallacy when reasoning is attacked:
+  "Everyone who supports this is just stupid" → ad hominem fallacy, not clarity.
+
+Loaded or scary wording on factual claims — NOT fallacy:
+- Scary adjectives ("dangerous", "deadly", "toxic") on a causal or empirical claim are NOT Appeal to Emotion by themselves.
+- If the author asserts a mechanism or outcome ("X causes Y", "waves can induce cancer", "proven to increase risk"), that is type "claim" when evidence is needed — NOT fallacy.
+- Use Appeal to Emotion only when the argument tries to win through fear, pity, or outrage INSTEAD of reasoning — not when loaded language wraps a falsifiable factual assertion.
+- Do NOT double-flag the same underlying issue as both claim and fallacy. If the core problem is missing evidence for a scary factual statement, use claim only.
+- Example — NOT fallacy (use claim if evidence needed): "They emit dangerous waves which can induce cancer in your brain."
+- Example — IS fallacy: "Imagine how terrified parents must feel — you cannot ignore this horror" with no factual claim to evaluate.
 
 Voice preservation rules:
 - The user stays the author.
@@ -111,6 +141,8 @@ Output rules:
 - Do not invent facts.
 - Do not cite real sources.
 - Do not return duplicate findings about the same underlying issue.
+- Do not split one assertion into multiple findings with overlapping spans. One card per distinct issue — prefer the single clearest span.
+- Example — return ONE claim, not two: for "they emit radiation, which we know causes cancer", do not also flag just "which we know causes cancer" separately.
 - Cap the output at 5 findings maximum.
 
 Debate context rules:
