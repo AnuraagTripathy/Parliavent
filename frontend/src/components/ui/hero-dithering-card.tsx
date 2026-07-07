@@ -17,7 +17,7 @@ interface CTASectionProps {
   ctaLabel?: string;
 }
 
-export function CTASection({ onStart, ctaLabel = "Explore live debates" }: CTASectionProps) {
+export function CTASection({ onStart, ctaLabel = "Start debating" }: CTASectionProps) {
   const [isHovered, setIsHovered] = useState(false);
 
   return (
@@ -30,13 +30,13 @@ export function CTASection({ onStart, ctaLabel = "Explore live debates" }: CTASe
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
       >
-        <div className="relative flex min-h-[520px] flex-col items-center justify-center overflow-hidden rounded-[40px] border border-border bg-card shadow-lg shadow-black/40 duration-500 md:min-h-[600px] lg:min-h-[680px] lg:rounded-[48px]">
+        <div className="relative flex min-h-[540px] flex-col items-center justify-center overflow-hidden rounded-[40px] border border-border bg-card shadow-lg shadow-black/40 md:min-h-[620px] lg:min-h-[680px] lg:rounded-[48px]">
           <Suspense
             fallback={
               <div className="absolute inset-0 animate-pulse bg-muted/30" />
             }
           >
-            <div className="pointer-events-none absolute inset-0 z-0 opacity-35 mix-blend-screen">
+            <div className="pointer-events-none absolute inset-0 z-0 opacity-25 mix-blend-screen">
               <Dithering
                 colorBack="#00000000"
                 colorFront="#EC4E02"
@@ -49,6 +49,9 @@ export function CTASection({ onStart, ctaLabel = "Explore live debates" }: CTASe
             </div>
           </Suspense>
 
+          {/* Dark ground behind the type so it stays readable over the shader */}
+          <div className="pointer-events-none absolute inset-0 z-[1] bg-[radial-gradient(ellipse_55%_60%_at_center,rgba(12,10,9,0.92)_0%,rgba(12,10,9,0.55)_55%,transparent_100%)]" />
+
           <motion.div
             className="relative z-10 mx-auto flex max-w-4xl flex-col items-center px-6 text-center"
             variants={staggerContainer}
@@ -57,16 +60,16 @@ export function CTASection({ onStart, ctaLabel = "Explore live debates" }: CTASe
           >
             <motion.div
               variants={staggerItem}
-              className="mb-8 inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/5 px-5 py-2 font-display text-[11px] font-medium uppercase tracking-[0.24em] text-primary backdrop-blur-sm"
+              className="mb-8 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background/60 px-5 py-2 font-display text-[11px] font-medium uppercase tracking-[0.24em] text-primary backdrop-blur-sm"
             >
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
               </span>
-              Fruitful debate, not fighting
+              Debates in session
             </motion.div>
 
-            <motion.h2
+            <motion.h1
               variants={staggerItem}
               className="mb-8 font-serif text-5xl font-semibold leading-[1.06] tracking-[-0.02em] text-foreground md:text-7xl lg:text-[5.25rem]"
             >
@@ -74,18 +77,18 @@ export function CTASection({ onStart, ctaLabel = "Explore live debates" }: CTASe
               <span className="font-normal italic text-foreground/70">
                 Not against each other.
               </span>
-            </motion.h2>
+            </motion.h1>
 
             <motion.p
               variants={staggerItem}
-              className="mb-12 max-w-2xl font-serif text-xl font-normal leading-relaxed text-muted-foreground md:text-2xl md:leading-relaxed"
+              className="mb-10 max-w-2xl text-balance text-base leading-relaxed text-muted-foreground md:text-lg"
             >
-              Parliavent is Reddit for people who want to understand — not dunk.
-              High-substance arguments, nested threads, and judge review that
-              keeps the conversation aimed at truth and learning, not winning.
+              Parliavent is a debate forum where every claim gets checked
+              before it posts. An AI judge flags weak points in your draft —
+              you attach the evidence, or your argument ships with caveats.
             </motion.p>
 
-            <motion.div variants={staggerItem}>
+            <motion.div variants={staggerItem} className="flex flex-col items-center gap-5 sm:flex-row">
               <Button
                 size="lg"
                 onClick={onStart}
@@ -94,6 +97,12 @@ export function CTASection({ onStart, ctaLabel = "Explore live debates" }: CTASe
                 <span className="relative z-10">{ctaLabel}</span>
                 <ArrowRight className="relative z-10 h-5 w-5 transition-transform duration-300 group-hover:translate-x-1" />
               </Button>
+              <a
+                href="#how-it-works"
+                className="text-sm font-medium text-muted-foreground underline decoration-border underline-offset-8 transition-colors hover:text-foreground hover:decoration-primary"
+              >
+                See how it works
+              </a>
             </motion.div>
           </motion.div>
         </div>

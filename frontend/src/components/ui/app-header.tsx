@@ -1,7 +1,8 @@
 "use client";
 
 import React from "react";
-import { Landmark, Plus } from "lucide-react";
+import Image from "next/image";
+import { Plus } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { MenuToggleIcon } from "@/components/ui/menu-toggle-icon";
@@ -60,11 +61,15 @@ export function AppHeader({
             onClick={() => closeAnd(onLogoClick)}
             className="flex shrink-0 items-center gap-2.5"
           >
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <Landmark className="h-4 w-4" strokeWidth={2.25} />
-            </span>
-            <span className="text-[15px] font-bold tracking-tight text-foreground">
-              parliavent
+            <Image
+              src="/parliavent-logo.png"
+              alt=""
+              width={36}
+              height={36}
+              className="h-9 w-9 object-contain"
+            />
+            <span className="font-display text-[17px] font-semibold tracking-[0.04em] text-foreground">
+              Parliavent
             </span>
           </button>
 
