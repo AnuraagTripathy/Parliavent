@@ -1,45 +1,132 @@
 "use client";
 
-import { useState } from "react";
-import { AlertTriangle, BookOpen, MessageCircleWarning } from "lucide-react";
-import { StaggerGroup, StaggerItem } from "@/components/ui/fade-in";
+import { useCallback, useMemo, useState } from "react";
+import { motion } from "framer-motion";
+import { PenLine } from "lucide-react";
+import type { fetchEvidenceSearchWithJob } from "@/lib/api/evidence";
+import { applyUserApprovedEdit } from "@/lib/applyUserEdit";
+import { citationsFromFindings, sourcesFromFindings } from "@/lib/citationsFromFindings";
+import { getReadiness } from "@/lib/readiness";
+import type {
+  EvidenceSearchResponse,
+  EvidenceSource,
+  Finding,
+  Source,
+} from "@/lib/types";
+import { Button } from "@/components/ui/button";
+import { ArgumentEditor } from "./ArgumentEditor";
+import { FindingsPanel } from "./FindingsPanel";
 
-type FindingId = "claim" | "fallacy" | "clarity";
+/**
+ * Landing-page demo of the composer. This is the REAL review UI —
+ * ArgumentEditor, FindingsPanel, FindingCard — running on local state with
+ * pre-seeded findings and a canned evidence search, so visitors can play
+ * with the exact interactions (apply rewrites, dispute, attach sources)
+ * without an account or API calls.
+ */
 
-interface Segment {
-  text: string;
-  finding?: FindingId;
-}
+const DEMO_TEXT =
+  "Companies should switch to a four-day work week. In the UK's 2022 trial, 56 of the 61 participating companies kept the four-day week after it ended. Anyone defending five days is just a corporate bootlicker. And honestly, the office grind is soul-crushing.";
 
-const ARGUMENT: Segment[] = [
-  { text: "Companies should switch to a four-day work week. " },
+const DEMO_FINDINGS: Finding[] = [
   {
-    text: "In the UK's 2022 trial, 56 of the 61 participating companies kept the four-day week after it ended.",
-    finding: "claim",
+    id: "demo-claim-1",
+    type: "claim",
+    status: "open",
+    spanText:
+      "In the UK's 2022 trial, 56 of the 61 participating companies kept the four-day week after it ended.",
+    title: "This statistic needs a source",
+    reason: "To verify the outcome of the UK's 2022 trial.",
+    claimKind: "factual",
   },
-  { text: " " },
   {
-    text: "Anyone defending five days is just a corporate bootlicker.",
-    finding: "fallacy",
+    id: "demo-fallacy-1",
+    type: "fallacy",
+    status: "open",
+    spanText: "Anyone defending five days is just a corporate bootlicker.",
+    title: "This could be read as an ad hominem attack",
+    subtitle: "Ad Hominem",
+    confidence: "80%",
+    reason:
+      "Instead of addressing the argument, this phrase attacks the character of those who disagree.",
+    example:
+      "\"Everyone who supports remote work is just lazy\" attacks people rather than engaging their reasons.",
+    suggestedRewrite:
+      "I have not yet heard a strong argument for keeping the five-day week.",
   },
-  { text: " And honestly, " },
-  { text: "the office grind is soul-crushing", finding: "clarity" },
-  { text: "." },
+  {
+    id: "demo-clarity-1",
+    type: "clarity",
+    status: "open",
+    spanText: "the office grind is soul-crushing",
+    title: "Consider more precise wording",
+    reason:
+      "While this phrase conveys a strong opinion, it may be perceived as overly emotive or vague.",
+    suggestedRewrite:
+      "the traditional office environment can be detrimental to mental health",
+  },
 ];
 
-const SPAN_STYLES: Record<FindingId, { base: string; active: string }> = {
-  claim: {
-    base: "underline decoration-sky-400/60 decoration-2 underline-offset-4",
-    active: "bg-sky-400/15 decoration-sky-400",
+const DEMO_EVIDENCE_SOURCES: EvidenceSource[] = [
+  {
+    id: "demo-source-autonomy",
+    title:
+      "The results are in: the UK's four-day week pilot",
+    publisher: "Autonomy",
+    url: "https://autonomy.work/portfolio/uk4dwpilotresults/",
+    snippet:
+      "Of the 61 companies that participated, 56 are continuing with the four-day week (92%), with 18 confirming the policy is a permanent change.",
+    supportLevel: "supports",
+    credibility: "high",
+    rationale:
+      "Official report from the pilot's research partner; directly states the 56-of-61 continuation figure.",
+    canAttachAsSupport: true,
+    evidencePassages: [
+      "Of the 61 companies that participated, 56 are continuing with the four-day week (92%).",
+    ],
   },
-  fallacy: {
-    base: "underline decoration-red-400/60 decoration-2 underline-offset-4",
-    active: "bg-red-400/15 decoration-red-400",
+  {
+    id: "demo-source-guardian",
+    title:
+      "Most UK firms in four-day week trial to continue with flexible working",
+    publisher: "The Guardian",
+    url: "https://www.theguardian.com/money/2023/feb/21/four-day-week-uk-trial-success-pattern",
+    snippet:
+      "The vast majority of companies taking part in the world's biggest trial of a four-day week have opted to continue with the new working pattern.",
+    supportLevel: "partially_supports",
+    credibility: "high",
+    rationale:
+      "Reports the trial outcome but summarizes rather than confirming the exact 56-of-61 count.",
+    canAttachAsSupport: true,
   },
-  clarity: {
-    base: "underline decoration-amber-400/60 decoration-2 underline-offset-4",
-    active: "bg-amber-400/15 decoration-amber-400",
-  },
+];
+
+const DEMO_EVIDENCE_RESULT: EvidenceSearchResponse = {
+  claim: DEMO_FINDINGS[0].spanText,
+  claimKind: "factual",
+  claimVerdict: "supported",
+  summary:
+    "Multiple reliable reports confirm that 56 of the 61 companies in the UK's 2022 pilot continued with the four-day week after the trial ended.",
+  sources: DEMO_EVIDENCE_SOURCES,
+  evidenceMode: "standard",
+};
+
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
+}
+
+/** Same shape as fetchEvidenceSearchWithJob, but canned: staged progress, then the demo result. */
+const demoFetchEvidence: typeof fetchEvidenceSearchWithJob = async (
+  _params,
+  options,
+) => {
+  options?.onProgress?.({ stage: "searching", progress: 30, message: "" });
+  await sleep(900);
+  options?.onProgress?.({ stage: "fetching_pages", progress: 60, message: "" });
+  await sleep(900);
+  options?.onProgress?.({ stage: "verifying", progress: 90, message: "" });
+  await sleep(700);
+  return DEMO_EVIDENCE_RESULT;
 };
 
 interface JudgePreviewProps {
@@ -47,166 +134,181 @@ interface JudgePreviewProps {
 }
 
 export function JudgePreview({ onTryIt }: JudgePreviewProps) {
-  const [active, setActive] = useState<FindingId | null>(null);
+  const [argumentText, setArgumentText] = useState(DEMO_TEXT);
+  const [findings, setFindings] = useState<Finding[]>(DEMO_FINDINGS);
 
-  const cardProps = (id: FindingId) => ({
-    onMouseEnter: () => setActive(id),
-    onMouseLeave: () => setActive(null),
-    onFocus: () => setActive(id),
-    onBlur: () => setActive(null),
-  });
+  const citations = useMemo(() => citationsFromFindings(findings), [findings]);
+  const attachedSources = useMemo(
+    () => sourcesFromFindings(findings),
+    [findings],
+  );
+  const { resolved, total, percent, label } = getReadiness(findings);
+
+  const updateFinding = useCallback(
+    (findingId: string, patch: Partial<Finding>) => {
+      setFindings((prev) =>
+        prev.map((f) => (f.id === findingId ? { ...f, ...patch } : f)),
+      );
+    },
+    [],
+  );
+
+  const applySuggestion = useCallback(
+    (findingId: string) => {
+      setFindings((prev) => {
+        const finding = prev.find((f) => f.id === findingId);
+        if (!finding?.suggestedRewrite) return prev;
+        setArgumentText((text) =>
+          applyUserApprovedEdit({
+            text,
+            spanText: finding.spanText,
+            replacement: finding.suggestedRewrite!,
+          }),
+        );
+        return prev.map((f) =>
+          f.id === findingId ? { ...f, status: "resolved" as const } : f,
+        );
+      });
+    },
+    [],
+  );
+
+  const applyRewrite = useCallback(
+    (findingId: string, replacement: string) => {
+      setFindings((prev) => {
+        const finding = prev.find((f) => f.id === findingId);
+        if (!finding) return prev;
+        setArgumentText((text) =>
+          applyUserApprovedEdit({
+            text,
+            spanText: finding.spanText,
+            replacement,
+          }),
+        );
+        return prev.map((f) =>
+          f.id === findingId ? { ...f, status: "resolved" as const } : f,
+        );
+      });
+    },
+    [],
+  );
+
+  const attachEvidenceSource = useCallback(
+    (findingId: string, evidenceSource: EvidenceSource) => {
+      if (!evidenceSource.canAttachAsSupport) return;
+      const source: Source = {
+        id: evidenceSource.id,
+        title: evidenceSource.title,
+        publisher: evidenceSource.publisher,
+        url: evidenceSource.url,
+        isSample: false,
+      };
+      updateFinding(findingId, {
+        status: "source_attached",
+        selectedSourceId: evidenceSource.id,
+        sources: [source],
+      });
+    },
+    [updateFinding],
+  );
 
   return (
-    <div className="mx-auto max-w-5xl">
-      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-2xl shadow-black/40">
-        {/* Composer chrome */}
-        <div className="flex items-center justify-between border-b border-border px-6 py-3">
-          <span className="font-display text-[10px] font-semibold uppercase tracking-[0.28em] text-muted-foreground">
-            Your argument
-          </span>
-          <span className="text-[11px] text-muted-foreground/60">256 chars</span>
-        </div>
-
-        {/* Argument with flagged spans */}
-        <div className="px-6 py-6 md:px-10 md:py-8">
-          <p className="text-base leading-loose text-foreground/90 md:text-lg">
-            {ARGUMENT.map((segment, i) =>
-              segment.finding ? (
-                <span
-                  key={i}
-                  className={`rounded-sm px-0.5 transition-colors duration-200 ${SPAN_STYLES[segment.finding].base} ${
-                    active === segment.finding
-                      ? SPAN_STYLES[segment.finding].active
-                      : ""
-                  }`}
-                >
-                  {segment.text}
-                </span>
-              ) : (
-                <span key={i}>{segment.text}</span>
-              ),
-            )}
-          </p>
-        </div>
-
-        {/* Judge review */}
-        <div className="border-t border-border bg-muted/20 px-6 py-6 md:px-10">
-          <div className="mb-5 flex items-center justify-between">
-            <span className="font-display text-[10px] font-semibold uppercase tracking-[0.28em] text-muted-foreground">
-              Judge review
-            </span>
-            <span className="rounded-full border border-border px-3 py-1 text-[11px] text-muted-foreground">
-              3 findings
-            </span>
+    <div className="mx-auto max-w-6xl overflow-hidden rounded-2xl border border-border bg-background text-left shadow-2xl shadow-black/40">
+      {/* Composer header — same markup as ComposerShell's starter state */}
+      <div className="border-b border-border bg-card/80">
+        <div className="w-full px-4 py-5 md:px-8">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary">
+              <PenLine className="h-4 w-4 text-muted-foreground" strokeWidth={2} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+                Starter · Live demo
+              </p>
+              <p className="mt-2 text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+                Motion
+              </p>
+              <h3 className="mt-0.5 text-lg font-bold leading-snug text-foreground sm:text-xl">
+                Four-day work weeks are so much better
+              </h3>
+              <p className="mt-2 text-[12px] text-muted-foreground">
+                Write → review judge findings → post. Your words, your call.
+              </p>
+            </div>
           </div>
-
-          <StaggerGroup className="grid gap-4 md:grid-cols-3">
-            <StaggerItem>
-              <div
-                {...cardProps("claim")}
-                tabIndex={0}
-                className="group h-full cursor-default rounded-xl border border-sky-400/25 bg-card p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-sky-400/60"
-              >
-                <p className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-sky-400">
-                  <BookOpen className="h-3.5 w-3.5" />
-                  Claim
-                </p>
-                <p className="mb-2 text-sm font-semibold text-foreground">
-                  This statistic needs a source
-                </p>
-                <p className="mb-4 text-xs leading-relaxed text-muted-foreground">
-                  To verify the outcome of the UK&apos;s 2022 trial.
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  <span className="rounded-full bg-sky-400/15 px-3 py-1 text-[11px] font-medium text-sky-400">
-                    Find sources
-                  </span>
-                  <span className="rounded-full border border-border px-3 py-1 text-[11px] text-muted-foreground">
-                    Keep as-is
-                  </span>
-                </div>
-              </div>
-            </StaggerItem>
-
-            <StaggerItem>
-              <div
-                {...cardProps("fallacy")}
-                tabIndex={0}
-                className="group h-full cursor-default rounded-xl border border-red-400/25 bg-card p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-red-400/60"
-              >
-                <div className="mb-2 flex items-center justify-between">
-                  <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-red-400">
-                    <AlertTriangle className="h-3.5 w-3.5" />
-                    Fallacy
-                  </p>
-                  <span className="text-[10px] text-muted-foreground/60">
-                    80% confidence
-                  </span>
-                </div>
-                <p className="mb-2 text-sm font-semibold text-foreground">
-                  Could be read as an ad hominem
-                </p>
-                <p className="mb-4 text-xs leading-relaxed text-muted-foreground">
-                  This phrase attacks the character of those who disagree
-                  instead of the argument.
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  <span className="rounded-full border border-border px-3 py-1 text-[11px] text-muted-foreground">
-                    Keep as-is
-                  </span>
-                  <span className="rounded-full border border-border px-3 py-1 text-[11px] text-muted-foreground">
-                    Dispute
-                  </span>
-                </div>
-              </div>
-            </StaggerItem>
-
-            <StaggerItem>
-              <div
-                {...cardProps("clarity")}
-                tabIndex={0}
-                className="group h-full cursor-default rounded-xl border border-amber-400/25 bg-card p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-400/60"
-              >
-                <p className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-amber-400">
-                  <MessageCircleWarning className="h-3.5 w-3.5" />
-                  Clarity
-                </p>
-                <p className="mb-2 text-sm font-semibold text-foreground">
-                  Consider more precise wording
-                </p>
-                <p className="mb-4 text-xs leading-relaxed text-muted-foreground">
-                  Strong opinion, but it may read as overly emotive or vague.
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  <span className="rounded-full bg-primary px-3 py-1 text-[11px] font-medium text-primary-foreground">
-                    Use suggestion
-                  </span>
-                  <span className="rounded-full border border-border px-3 py-1 text-[11px] text-muted-foreground">
-                    Keep as-is
-                  </span>
-                </div>
-              </div>
-            </StaggerItem>
-          </StaggerGroup>
-        </div>
-
-        {/* Footer bar */}
-        <div className="flex items-center justify-between border-t border-border px-6 py-3">
-          <span className="text-xs text-muted-foreground">3 items to review</span>
-          <button
-            type="button"
-            onClick={onTryIt}
-            className="rounded-full bg-primary px-5 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Post starter
-          </button>
         </div>
       </div>
 
-      <p className="mt-4 text-center text-xs text-muted-foreground">
-        Hover a card to see what it flags. Your words stay yours — nothing
-        changes without your click.
-      </p>
+      <div className="flex w-full flex-col gap-6 px-4 pb-6 pt-6 md:px-8">
+        <section className="mx-auto w-full max-w-4xl">
+          <ArgumentEditor
+            text={argumentText}
+            findings={findings}
+            citations={citations}
+            attachedSources={attachedSources}
+            onChange={setArgumentText}
+          />
+        </section>
+
+        <section className="mx-auto w-full max-w-6xl">
+          <FindingsPanel
+            findings={findings}
+            argumentText={argumentText}
+            fetchEvidence={demoFetchEvidence}
+            onUseSuggestion={applySuggestion}
+            onKeepAsIs={(id) => updateFinding(id, { status: "ignored" })}
+            onSourceSearchResult={(id, result) =>
+              updateFinding(id, {
+                sourceCandidates: result.sources,
+                claimKind: result.claimKind,
+                evidenceClaimVerdict: result.claimVerdict,
+                evidenceSummary: result.summary,
+                evidenceMode: result.evidenceMode,
+              })
+            }
+            onAttachEvidenceSource={attachEvidenceSource}
+            onApplyRewrite={applyRewrite}
+            onMarkAsOpinion={(id) =>
+              updateFinding(id, { status: "marked_opinion" })
+            }
+            onDispute={(id, reason) =>
+              updateFinding(id, { status: "disputed", disputeReason: reason })
+            }
+          />
+        </section>
+      </div>
+
+      {/* Readiness bar — same markup as ReadinessBar, scoped to the card */}
+      <footer className="border-t border-border bg-background/95">
+        <div className="flex w-full items-center gap-4 px-4 py-3 md:px-8">
+          <div className="min-w-0 flex-1">
+            <div className="mb-1.5 flex items-center justify-between gap-2">
+              <p className="truncate text-[12px] font-semibold text-foreground/70">
+                {label}
+              </p>
+              <p className="shrink-0 text-[11px] text-muted-foreground">
+                {resolved}/{total} resolved
+              </p>
+            </div>
+            <div className="h-1 overflow-hidden rounded-full bg-secondary">
+              <motion.div
+                className="h-full rounded-full bg-primary"
+                initial={{ width: 0 }}
+                animate={{ width: `${percent}%` }}
+                transition={{ duration: 0.5, ease: "easeOut" }}
+              />
+            </div>
+          </div>
+
+          <Button
+            size="sm"
+            onClick={onTryIt}
+            className="h-9 shrink-0 px-4 text-[12px] font-bold"
+          >
+            Post starter
+          </Button>
+        </div>
+      </footer>
     </div>
   );
 }

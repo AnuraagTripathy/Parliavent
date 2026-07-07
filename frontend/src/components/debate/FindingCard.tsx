@@ -29,6 +29,8 @@ interface FindingCardProps {
   argumentText: string;
   threadId?: string;
   layout?: "stack" | "carousel";
+  /** Override the evidence search transport (used by the landing-page demo). */
+  fetchEvidence?: typeof fetchEvidenceSearchWithJob;
   onUseSuggestion: (findingId: string) => void;
   onKeepAsIs: (findingId: string) => void;
   onSourceSearchResult: (findingId: string, result: EvidenceSearchResponse) => void;
@@ -131,6 +133,7 @@ export function FindingCard({
   argumentText,
   threadId,
   layout = "stack",
+  fetchEvidence = fetchEvidenceSearchWithJob,
   onUseSuggestion,
   onKeepAsIs,
   onSourceSearchResult,
@@ -183,7 +186,7 @@ export function FindingCard({
     setSourceSearchEmpty(false);
 
     try {
-      const result = await fetchEvidenceSearchWithJob(
+      const result = await fetchEvidence(
         {
           claim: finding.spanText,
           argumentText,

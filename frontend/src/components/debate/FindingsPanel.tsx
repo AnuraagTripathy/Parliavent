@@ -17,6 +17,8 @@ interface FindingsPanelProps {
   checkingState?: CheckingState;
   judgeError?: string | null;
   isTooShort?: boolean;
+  /** Override the evidence search transport (used by the landing-page demo). */
+  fetchEvidence?: React.ComponentProps<typeof FindingCard>["fetchEvidence"];
   onCheckNow?: () => void;
   pendingOverlapApply?: string | null;
   onConfirmOverlapApply?: () => void;
@@ -40,6 +42,7 @@ export function FindingsPanel({
   checkingState = "complete",
   judgeError = null,
   isTooShort = false,
+  fetchEvidence,
   onCheckNow,
   pendingOverlapApply = null,
   onConfirmOverlapApply,
@@ -94,6 +97,7 @@ export function FindingsPanel({
           finding={finding}
           argumentText={argumentText}
           threadId={threadId}
+          fetchEvidence={fetchEvidence}
           layout="carousel"
           onUseSuggestion={onUseSuggestion}
           onKeepAsIs={onKeepAsIs}

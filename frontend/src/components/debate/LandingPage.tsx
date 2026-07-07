@@ -162,8 +162,9 @@ export function LandingPage({ onEnterDebates, isSignedIn }: LandingPageProps) {
             The judge in <span className="text-outline-primary">action</span>
           </h2>
           <p className="mx-auto mb-12 max-w-2xl text-center text-base leading-relaxed text-muted-foreground md:text-lg">
-            This is the actual review screen. Draft your argument, and the
-            judge flags what a sharp opponent would attack — before they can.
+            This is the real review screen — try it. Apply the suggested
+            rewrite, dispute the fallacy, or hit &ldquo;Find sources&rdquo; and
+            watch the evidence check run.
           </p>
 
           <JudgePreview onTryIt={onEnterDebates} />
