@@ -300,6 +300,8 @@ export interface SavedDebateSummary {
   mode: JudgeMode;
   createdAt: string;
   updatedAt: string;
+  /** True when the signed-in viewer created this debate's starter post */
+  isYours: boolean;
   starterPost: SavedDebateStarterPreview | null;
   postCount: number;
   findingCount: number;

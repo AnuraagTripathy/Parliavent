@@ -214,6 +214,7 @@ export function toSavedDebateSummary(
       text: string;
       postType: string;
       parentPostId: string | null;
+      authorId: string | null;
       authorName: string;
       publishedAt: Date | null;
       findings: (Finding & {
@@ -223,6 +224,7 @@ export function toSavedDebateSummary(
       caveats: Array<Pick<Caveat, "type" | "findingId" | "message">>;
     }>;
   },
+  viewerId: string,
 ): SavedDebateSummary {
   const starter =
     debate.posts.find(
@@ -277,6 +279,7 @@ export function toSavedDebateSummary(
     mode: debate.mode as JudgeMode,
     createdAt: debate.createdAt.toISOString(),
     updatedAt: debate.updatedAt.toISOString(),
+    isYours: Boolean(starter?.authorId && starter.authorId === viewerId),
     starterPost: starter
       ? {
           id: starter.id,

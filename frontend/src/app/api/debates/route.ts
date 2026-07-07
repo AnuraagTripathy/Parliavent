@@ -38,7 +38,9 @@ export async function GET(request: Request) {
     });
 
     return NextResponse.json({
-      debates: debates.map(toSavedDebateSummary),
+      debates: debates.map((debate) =>
+        toSavedDebateSummary(debate, auth.authorId),
+      ),
     });
   } catch (error) {
     console.error("GET /api/debates failed:", error);

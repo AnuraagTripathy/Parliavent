@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, Bookmark, BookOpen, Flame, HelpCircle, MessageSquare, ShieldAlert } from "lucide-react";
+import { AlertTriangle, Bookmark, BookOpen, Flame, HelpCircle, MessageSquare, ShieldAlert, Users } from "lucide-react";
 import { listDebates } from "@/lib/api/persistence";
 import { isShowcaseSlug, showcaseDebateSortIndex } from "@/lib/showcaseMeta";
 import type { JudgeMode, SavedDebateSummary } from "@/lib/types";
@@ -58,10 +58,15 @@ function DebateCard({
               <Flame className="h-3 w-3" strokeWidth={2.5} />
               Showcase
             </Badge>
-          ) : (
+          ) : debate.isYours ? (
             <Badge className="gap-1 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary">
               <Bookmark className="h-3 w-3" strokeWidth={2.5} />
               Yours
+            </Badge>
+          ) : (
+            <Badge className="gap-1 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary">
+              <Users className="h-3 w-3" strokeWidth={2.5} />
+              Community
             </Badge>
           )}
           <Badge variant="secondary" className="text-[11px] uppercase tracking-wide">
@@ -198,11 +203,7 @@ export function DebateFeed({
 
     listDebates()
       .then(({ debates: loaded }) => {
-        if (!cancelled) {
-          const showcase = loaded.filter((d) => isShowcaseSlug(d.slug));
-          const userDebates = loaded.filter((d) => !isShowcaseSlug(d.slug));
-          setDebates([...showcase, ...userDebates]);
-        }
+        if (!cancelled) setDebates(loaded);
       })
       .catch((err) => {
         console.warn("Could not load debates:", err);
@@ -228,7 +229,12 @@ export function DebateFeed({
       (a, b) =>
         showcaseDebateSortIndex(a.slug) - showcaseDebateSortIndex(b.slug),
     );
-  const userDebates = debates.filter((d) => !isShowcaseSlug(d.slug));
+  const yourDebates = debates.filter(
+    (d) => !isShowcaseSlug(d.slug) && d.isYours,
+  );
+  const communityDebates = debates.filter(
+    (d) => !isShowcaseSlug(d.slug) && !d.isYours,
+  );
 
   return (
     <div className="w-full px-4 py-8 md:px-8 lg:px-12 xl:px-16">
@@ -240,7 +246,8 @@ export function DebateFeed({
           Debates
         </h1>
         <p className="mt-2 max-w-2xl text-muted-foreground">
-          Live showcase threads from Postgres · your own debates when you create them.
+          Interesting debates from the community — and your own when you create
+          them.
         </p>
       </div>
 
@@ -264,16 +271,16 @@ export function DebateFeed({
         </Card>
       )}
 
-      {!isLoading && showcaseDebates.length > 0 && (
+      {!isLoading && yourDebates.length > 0 && (
         <section className="mb-14">
           <h2 className="mb-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-            Showcase debates
+            Your debates
           </h2>
           <p className="mb-5 text-sm text-muted-foreground">
-            Seeded back-and-forth threads with review notes, caveats, and nested replies.
+            Debates and drafts you created.
           </p>
           <StaggerGroup className="grid w-full gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {showcaseDebates.map((debate) => (
+            {yourDebates.map((debate) => (
               <StaggerItem key={debate.id}>
                 <DebateCard
                   debate={debate}
@@ -285,16 +292,37 @@ export function DebateFeed({
         </section>
       )}
 
-      {!isLoading && userDebates.length > 0 && (
-        <section>
+      {!isLoading && communityDebates.length > 0 && (
+        <section className="mb-14">
           <h2 className="mb-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-            Your debates
+            Community debates
           </h2>
           <p className="mb-5 text-sm text-muted-foreground">
-            Debates you created — persisted in your local database.
+            Published debates started by other members — jump in with a reply.
           </p>
           <StaggerGroup className="grid w-full gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {userDebates.map((debate) => (
+            {communityDebates.map((debate) => (
+              <StaggerItem key={debate.id}>
+                <DebateCard
+                  debate={debate}
+                  onOpen={() => onOpenSavedDebate(debate.id)}
+                />
+              </StaggerItem>
+            ))}
+          </StaggerGroup>
+        </section>
+      )}
+
+      {!isLoading && showcaseDebates.length > 0 && (
+        <section>
+          <h2 className="mb-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+            Showcase debates
+          </h2>
+          <p className="mb-5 text-sm text-muted-foreground">
+            Curated threads with review notes, caveats, and nested replies.
+          </p>
+          <StaggerGroup className="grid w-full gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {showcaseDebates.map((debate) => (
               <StaggerItem key={debate.id}>
                 <DebateCard
                   debate={debate}
