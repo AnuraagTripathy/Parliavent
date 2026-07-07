@@ -1,0 +1,48 @@
+# Render Blueprint for Parliavent's backing services.
+# The Next.js app itself deploys to Vercel (see docs/DEPLOYMENT.md);
+# this blueprint provisions the database and the OPTIONAL async evidence stack.
+#
+# Free-tier caveats (see DEPLOYMENT.md):
+# - Free Render Postgres EXPIRES 30 DAYS after creation (14-day grace period,
+#   then the data is deleted). Neon/Supabase free Postgres does not expire.
+# - Free web services spin down after 15 min of inactivity (~1 min cold start).
+# - Free Key Value instances have no disk persistence (jobs are transient
+#   anyway — the app falls back to sync evidence search if this stack is down).
+
+databases:
+  - name: parliavent-db
+    plan: free
+    databaseName: parliavent
+    user: parliavent
+
+services:
+  # ---------------------------------------------------------------------------
+  # OPTIONAL: async evidence-jobs stack (FastAPI + Key Value).
+  # Delete everything below if you deploy without it — the app automatically
+  # falls back to the synchronous /api/evidence/search route.
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: parliavent-evidence-api
+    runtime: python
+    plan: free
+    rootDir: services/evidence-api
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: parliavent-jobs
+          property: connectionString
+      # Your Vercel deployment URL, e.g. https://parliavent.vercel.app
+      - key: NEXTJS_BASE_URL
+        sync: false
+      # Long random string; must match EVIDENCE_INTERNAL_SECRET on Vercel.
+      - key: EVIDENCE_INTERNAL_SECRET
+        sync: false
+
+  - type: keyvalue
+    name: parliavent-jobs
+    plan: free
+    ipAllowList: [] # internal connections only

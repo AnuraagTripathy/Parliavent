@@ -22,7 +22,7 @@ It should not feel like:
 
 ## Visual personality
 
-- Custom UI, no shadcn.
+- shadcn/ui primitives (`frontend/src/components/ui/`) themed with warm dark surfaces + vermillion accent (`#EC4E02`) in `globals.css`. App components compose these primitives.
 - Tailwind is allowed.
 - Use a modern grotesk/system sans-serif stack.
 - **Current direction:** dark zinc surfaces, teal accents, bold type — edgy and readable.
