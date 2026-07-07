@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { CTASection } from "@/components/ui/hero-dithering-card";
 import { Hemicycle } from "@/components/ui/hemicycle";
+import { JudgePreview } from "@/components/debate/JudgePreview";
 import { Badge } from "@/components/ui/badge";
 import { FadeIn, StaggerGroup, StaggerItem } from "@/components/ui/fade-in";
 import { SHOWCASE_DEBATE_META } from "@/lib/showcaseMeta";
@@ -144,6 +145,31 @@ export function LandingPage({ onEnterDebates, isSignedIn }: LandingPageProps) {
         </div>
       </FadeIn>
 
+      {/* ── Sneak peek — the judge in action ────────────────── */}
+      <FadeIn className="relative w-full overflow-hidden border-t border-border bg-muted/20 px-4 py-24 md:px-8 lg:px-12 xl:px-16">
+        <span
+          aria-hidden="true"
+          className="text-outline pointer-events-none absolute -left-10 top-4 select-none font-display text-[10rem] font-bold leading-none opacity-[0.06] md:text-[16rem]"
+        >
+          02
+        </span>
+
+        <div className="relative mx-auto max-w-6xl">
+          <p className="mb-4 text-center font-display text-[11px] font-medium uppercase tracking-[0.3em] text-primary">
+            Sneak peek
+          </p>
+          <h2 className="mb-5 text-center font-display text-4xl font-semibold uppercase tracking-tight text-foreground md:text-5xl">
+            The judge in <span className="text-outline-primary">action</span>
+          </h2>
+          <p className="mx-auto mb-12 max-w-2xl text-center text-base leading-relaxed text-muted-foreground md:text-lg">
+            This is the actual review screen. Draft your argument, and the
+            judge flags what a sharp opponent would attack — before they can.
+          </p>
+
+          <JudgePreview onTryIt={onEnterDebates} />
+        </div>
+      </FadeIn>
+
       <Ticker />
 
       {/* ── How it works ────────────────────────────────────── */}
@@ -153,9 +179,9 @@ export function LandingPage({ onEnterDebates, isSignedIn }: LandingPageProps) {
       >
         <span
           aria-hidden="true"
-          className="text-outline pointer-events-none absolute -left-10 top-4 select-none font-display text-[10rem] font-bold leading-none opacity-[0.06] md:text-[16rem]"
+          className="text-outline pointer-events-none absolute -right-8 top-4 select-none font-display text-[10rem] font-bold leading-none opacity-[0.06] md:text-[16rem]"
         >
-          02
+          03
         </span>
 
         <div className="mx-auto max-w-6xl">
@@ -196,9 +222,9 @@ export function LandingPage({ onEnterDebates, isSignedIn }: LandingPageProps) {
       <FadeIn className="relative w-full overflow-hidden border-t border-border bg-muted/20 px-4 py-24 md:px-8 lg:px-12 xl:px-16">
         <span
           aria-hidden="true"
-          className="text-outline pointer-events-none absolute -right-8 bottom-0 select-none font-display text-[10rem] font-bold leading-none opacity-[0.06] md:text-[16rem]"
+          className="text-outline pointer-events-none absolute -left-10 bottom-0 select-none font-display text-[10rem] font-bold leading-none opacity-[0.06] md:text-[16rem]"
         >
-          03
+          04
         </span>
 
         <div className="mx-auto max-w-6xl">
